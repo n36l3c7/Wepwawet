@@ -31,7 +31,8 @@ case "$kind" in
     apt-get install -y -qq --no-install-recommends xvfb xauth libgl1 libegl1 libfontconfig1 libdbus-1-3 \
       libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
       libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libx11-xcb1 libnss3 \
-      libxcomposite1 libxdamage1 libxrandr2 libxtst6 libxkbfile1 libxfixes3 libgssapi-krb5-2 >/dev/null
+      libxcomposite1 libxdamage1 libxrandr2 libxtst6 libxkbfile1 libxfixes3 libgssapi-krb5-2       liblcms2-2 libopus0 libsnappy1v5 libwebp7 libwebpdemux2 libwebpmux3 >/dev/null
+    apt-get install -y -qq --no-install-recommends libminizip1t64 >/dev/null 2>&1       || apt-get install -y -qq --no-install-recommends libminizip1 >/dev/null
     apt-get install -y -qq --no-install-recommends libglib2.0-0t64 >/dev/null 2>&1 \
       || apt-get install -y -qq --no-install-recommends libglib2.0-0 >/dev/null
     apt-get install -y -qq --no-install-recommends libasound2t64 >/dev/null 2>&1 \

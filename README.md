@@ -10,7 +10,7 @@ Measurement-based IP geolocation for Linux: passive evidence plus ping and trace
 
 ![The Wepwawet window](docs/img/main-window.png)
 
-> **Status: v0.1.0, first release.** This version ships the application itself: the desktop window, the
+> **Status: v0.1.1.** This version ships the application itself: the desktop window, the
 > map, the local server, the command line and the Linux packages. Locating targets starts in v0.2.0; see
 > [Roadmap](#roadmap).
 
@@ -52,17 +52,17 @@ Download the package for your distribution from the
 
 ```sh
 # Debian, Ubuntu, Kali
-sudo apt install ./wepwawet_0.1.0-1_amd64.deb
+sudo apt install ./wepwawet_0.1.1-1_amd64.deb
 
 # Fedora
-sudo dnf install ./wepwawet-0.1.0-1.x86_64.rpm
+sudo dnf install ./wepwawet-0.1.1-1.x86_64.rpm
 
 # Arch Linux
-sudo pacman -U wepwawet-0.1.0-1-x86_64.pkg.tar.zst
+sudo pacman -U wepwawet-0.1.1-1-x86_64.pkg.tar.zst
 
 # Any distribution: AppImage (needs libfuse2, or run it with --appimage-extract-and-run)
-chmod +x Wepwawet-0.1.0-x86_64.AppImage
-./Wepwawet-0.1.0-x86_64.AppImage
+chmod +x Wepwawet-0.1.1-x86_64.AppImage
+./Wepwawet-0.1.1-x86_64.AppImage
 ```
 
 The packages install the system libraries Qt needs and recommend `mtr` and `traceroute` for measurements

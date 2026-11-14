@@ -68,8 +68,8 @@ jobs:
 
   packages:
     name: Packages (${{ matrix.arch }})
-    # Heavy (about 10 minutes each): main, tags and manual runs only.
-    if: github.event_name != 'pull_request'
+    # Heavy (about 10 minutes each): release tags and manual runs only.
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     needs: [python, frontend]
     strategy:
       matrix:

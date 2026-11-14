@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-14
+
+### Fixed
+
+- arm64 packages: declare the system libraries that Qt WebEngine links on aarch64 (lcms2, minizip,
+  opus, snappy, webp); without them the window could not start on Debian, Ubuntu, Kali and Fedora.
+
 ## [0.1.0] - 2026-11-14
 
 First release: the application, without geolocation yet.
@@ -30,5 +37,6 @@ First release: the application, without geolocation yet.
   supported distribution.
 - Documentation site in `docs/`.
 
-[Unreleased]: https://github.com/n36l3c7/Wepwawet/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/n36l3c7/Wepwawet/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/n36l3c7/Wepwawet/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/n36l3c7/Wepwawet/releases/tag/v0.1.0

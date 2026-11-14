@@ -72,6 +72,14 @@ overrides:
       - libglib2.0-0t64 | libglib2.0-0
       - libgssapi-krb5-2
       - libasound2t64 | libasound2
+      # Bundled by Qt on x86_64, linked from the system on aarch64.
+      - liblcms2-2
+      - libminizip1t64 | libminizip1
+      - libopus0
+      - libsnappy1v5
+      - libwebp7
+      - libwebpdemux2
+      - libwebpmux3
     recommends:
       - mtr-tiny | mtr
       - traceroute
@@ -98,6 +106,14 @@ overrides:
       - glib2
       - krb5-libs
       - alsa-lib
+      # Bundled by Qt on x86_64, linked from the system on aarch64 (soname dependencies).
+      - liblcms2.so.2()(64bit)
+      - libminizip.so.1()(64bit)
+      - libopus.so.0()(64bit)
+      - libsnappy.so.1()(64bit)
+      - libwebp.so.7()(64bit)
+      - libwebpdemux.so.2()(64bit)
+      - libwebpmux.so.3()(64bit)
     recommends:
       - mtr
       - traceroute
@@ -125,6 +141,11 @@ overrides:
       - alsa-lib
       # Arch's fontconfig installs no font; Chromium's renderer aborts without any system font.
       - ttf-font
+      - lcms2
+      - minizip
+      - opus
+      - snappy
+      - libwebp
 
 rpm:
   summary: Measurement-based IP geolocation
