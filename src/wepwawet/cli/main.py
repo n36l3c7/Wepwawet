@@ -203,7 +203,8 @@ app.add_typer(data_app, name="data")
 @data_app.command("update")
 def data_update(
     only: Annotated[
-        list[str] | None, typer.Option("--only", help="dbip, ipinfo, geolite or geonames (repeatable). Default: all.")
+        list[str] | None,
+        typer.Option("--only", help="dbip, ipinfo, geolite, geonames or places (repeatable). Default: all."),
     ] = None,
 ) -> None:
     """Download the free GeoIP databases (DB-IP Lite always; IPinfo and GeoLite2 when keys are set)."""

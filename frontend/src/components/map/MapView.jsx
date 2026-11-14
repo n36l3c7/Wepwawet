@@ -5,7 +5,10 @@ import { BASEMAPS, offlineStyle, readPalette, themeCartoStyle } from '../../lib/
 import {
   POINT_KINDS,
   accuracyCircles,
+  PATH_COLORS,
   diskFeatures,
+  hopFeatures,
+  pathFeatures,
   probeFeatures,
   regionFeatures,
   reportBounds,
@@ -22,7 +25,9 @@ export const LAYERS = [
   { id: 'region', label: 'Feasible region' },
   { id: 'disks', label: 'RTT disks', initiallyOff: true },
   { id: 'accuracy', label: 'GeoIP accuracy' },
+  { id: 'paths', label: 'Traceroutes' },
   { id: 'probes', label: 'Probes' },
+  { id: 'convergence', label: 'Convergence' },
   { id: 'estimate', label: 'Estimate' },
   { id: 'passive', label: 'Passive answers' },
   { id: 'facilities', label: 'PeeringDB facilities' },
@@ -108,6 +113,25 @@ function layerSpecs(palette) {
         },
       },
     ],
+    paths: [
+      {
+        id: 'wpw-paths',
+        type: 'line',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': PATH_COLOR(palette), 'line-width': 2, 'line-opacity': 0.85 },
+      },
+      {
+        id: 'wpw-hops',
+        type: 'circle',
+        source: 'hops',
+        paint: {
+          'circle-radius': 3.5,
+          'circle-color': palette.canvas,
+          'circle-stroke-color': PATH_COLOR(palette),
+          'circle-stroke-width': 1.5,
+        },
+      },
+    ],
     estimate: [
       {
         id: 'wpw-uncertainty',
@@ -119,7 +143,21 @@ function layerSpecs(palette) {
   }
 }
 
-const SOURCE_OF = { region: 'region', estimate: 'region', disks: 'disks', accuracy: 'accuracy', probes: 'probes' }
+const SOURCE_OF = {
+  region: 'region',
+  estimate: 'region',
+  disks: 'disks',
+  accuracy: 'accuracy',
+  probes: 'probes',
+  paths: 'paths',
+}
+
+const PATH_COLOR = (palette) => [
+  'match',
+  ['get', 'color'],
+  ...PATH_COLORS.flatMap((name) => [name, palette[name] || palette.accent]),
+  palette.accent,
+]
 
 /** Add (after a style change) or update every overlay source and layer, honouring visibility. */
 function drawOverlays(map, data, visible) {
@@ -133,7 +171,9 @@ function drawOverlays(map, data, visible) {
   }
   for (const [toggle, layers] of Object.entries(layerSpecs(palette))) {
     for (const layer of layers) {
-      if (!map.getLayer(layer.id)) map.addLayer({ ...layer, source: `wpw-src-${SOURCE_OF[toggle]}` })
+      if (!map.getLayer(layer.id)) {
+        map.addLayer({ ...layer, source: `wpw-src-${layer.source ?? SOURCE_OF[toggle]}` })
+      }
       map.setLayoutProperty(layer.id, 'visibility', visible[toggle] ? 'visible' : 'none')
     }
   }
@@ -205,6 +245,10 @@ export default function MapView({ basemap, cartoStyleUrl, report, points, onBase
       popup.setLngLat(event.lngLat).setText(event.features[0].properties.title).addTo(map)
     })
     map.on('mouseleave', 'wpw-probes', () => popup.remove())
+    map.on('mouseenter', 'wpw-hops', (event) => {
+      popup.setLngLat(event.lngLat).setText(event.features[0].properties.title).addTo(map)
+    })
+    map.on('mouseleave', 'wpw-hops', () => popup.remove())
     mapRef.current = map
     return () => {
       map.remove()
@@ -239,6 +283,8 @@ export default function MapView({ basemap, cartoStyleUrl, report, points, onBase
       disks: diskFeatures(report),
       accuracy: accuracyCircles(points),
       probes: probeFeatures(report),
+      paths: pathFeatures(report),
+      hops: hopFeatures(report),
     }
     drawOverlays(map, dataRef.current, visibleRef.current)
   }, [report, points])
@@ -259,6 +305,20 @@ export default function MapView({ basemap, cartoStyleUrl, report, points, onBase
     const markers = ordered.map((point) =>
       new Marker({ element: markerElement(point), anchor: 'center' }).setLngLat([point.lon, point.lat]).addTo(map),
     )
+    const conv = report?.convergence
+    if (conv?.location && visible.convergence) {
+      const element = document.createElement('div')
+      element.className = 'wpw-convergence'
+      element.setAttribute('role', 'img')
+      const text = `${conv.paths}/${conv.of} paths · ${conv.hostname ?? conv.address}`
+      element.setAttribute('aria-label', `Convergence: ${text}`)
+      const label = document.createElement('span')
+      label.textContent = text
+      element.appendChild(label)
+      markers.push(
+        new Marker({ element, anchor: 'center' }).setLngLat([conv.location.lon, conv.location.lat]).addTo(map),
+      )
+    }
     if (report?.estimate && visible.estimate) {
       const { location } = report.estimate
       markers.push(

@@ -1,0 +1,168 @@
+# Operator naming rules for router hostnames (Hoiho-style).
+#
+# Each rule applies to hostnames ending in `domain`. `pattern` is a Python regular expression
+# applied to the lowercase hostname; its `code` group is the place code. `kind` says how to read it:
+#   iata  - an airport code, looked up in OurAirports
+#   city  - a city name, looked up in GeoNames
+#   map   - a code of this operator, translated by `codes` into "City, CC" (looked up in GeoNames)
+# Rules are tried before the generic heuristics and get a higher confidence.
+# To add an operator, copy a rule; `wepwawet locate` uses the file of the installed version.
+
+[[rule]]
+operator = "Hurricane Electric"
+domain = "he.net"
+pattern = '\.(?P<code>[a-z]{3})\d+\.he\.net$'
+kind = "iata"
+
+[[rule]]
+operator = "Cogent"
+domain = "cogentco.com"
+pattern = '\.(?P<code>[a-z]{3})\d+\.atlas\.cogentco\.com$'
+kind = "iata"
+
+[[rule]]
+operator = "Google"
+domain = "1e100.net"
+pattern = '^(?P<code>[a-z]{3})\d+s\d+-in-'
+kind = "iata"
+
+[[rule]]
+operator = "Lumen (Level 3)"
+domain = "level3.net"
+pattern = '\.(?P<code>[a-z]+?)\d*\.level3\.net$'
+kind = "city"
+
+[[rule]]
+operator = "Arelion (Twelve99)"
+domain = "twelve99.net"
+pattern = '^(?P<code>[a-z]{3,4})-'
+kind = "map"
+[rule.codes]
+ffm = "Frankfurt am Main, DE"
+mil = "Milan, IT"
+prs = "Paris, FR"
+ldn = "London, GB"
+adm = "Amsterdam, NL"
+sto = "Stockholm, SE"
+kbn = "Copenhagen, DK"
+hbg = "Hamburg, DE"
+bei = "Berlin, DE"
+mno = "Munich, DE"
+vie = "Vienna, AT"
+war = "Warsaw, PL"
+mad = "Madrid, ES"
+mrs = "Marseille, FR"
+zch = "Zurich, CH"
+osl = "Oslo, NO"
+hls = "Helsinki, FI"
+nyk = "New York City, US"
+ash = "Ashburn, US"
+chi = "Chicago, US"
+dls = "Dallas, US"
+sjo = "San Jose, US"
+las = "Los Angeles, US"
+mia = "Miami, US"
+sea = "Seattle, US"
+tky = "Tokyo, JP"
+hnk = "Hong Kong, HK"
+sng = "Singapore, SG"
+
+[[rule]]
+operator = "Arelion (Telia, former name)"
+domain = "telia.net"
+pattern = '^(?P<code>[a-z]{3,4})-'
+kind = "map"
+[rule.codes]
+ffm = "Frankfurt am Main, DE"
+mil = "Milan, IT"
+prs = "Paris, FR"
+ldn = "London, GB"
+adm = "Amsterdam, NL"
+sto = "Stockholm, SE"
+nyk = "New York City, US"
+ash = "Ashburn, US"
+
+[[rule]]
+operator = "NTT"
+domain = "gin.ntt.net"
+pattern = '\.(?P<code>[a-z]{6})\d*\.[a-z]{2}\.bb\.gin\.ntt\.net$'
+kind = "map"
+[rule.codes]
+frnkge = "Frankfurt am Main, DE"
+mlanit = "Milan, IT"
+amstnl = "Amsterdam, NL"
+londen = "London, GB"
+parsfr = "Paris, FR"
+mdrdsp = "Madrid, ES"
+stkhsw = "Stockholm, SE"
+nwrknj = "Newark, US"
+nycmny = "New York City, US"
+asbnva = "Ashburn, US"
+chcgil = "Chicago, US"
+dllstx = "Dallas, US"
+snjsca = "San Jose, US"
+lsanca = "Los Angeles, US"
+sttlwa = "Seattle, US"
+miamfl = "Miami, US"
+tokyjp = "Tokyo, JP"
+osakjp = "Osaka, JP"
+sngpsi = "Singapore, SG"
+hkgchk = "Hong Kong, HK"
+sydnau = "Sydney, AU"
+
+[[rule]]
+operator = "Telecom Italia Sparkle (Seabone)"
+domain = "seabone.net"
+pattern = '\.(?P<code>[a-z]{3})\d*\.seabone\.net$'
+kind = "map"
+[rule.codes]
+mil = "Milan, IT"
+rom = "Rome, IT"
+pal = "Palermo, IT"
+fra = "Frankfurt am Main, DE"
+par = "Paris, FR"
+lon = "London, GB"
+ams = "Amsterdam, NL"
+mad = "Madrid, ES"
+mar = "Marseille, FR"
+nyc = "New York City, US"
+mia = "Miami, US"
+
+[[rule]]
+operator = "GTT"
+domain = "gtt.net"
+pattern = '-(?P<code>[a-z]{3})\d*\.(?:ip4\.|ip6\.)?gtt\.net$'
+kind = "map"
+[rule.codes]
+mil = "Milan, IT"
+fra = "Frankfurt am Main, DE"
+par = "Paris, FR"
+lon = "London, GB"
+ams = "Amsterdam, NL"
+mad = "Madrid, ES"
+sto = "Stockholm, SE"
+vie = "Vienna, AT"
+zur = "Zurich, CH"
+nyc = "New York City, US"
+ash = "Ashburn, US"
+chi = "Chicago, US"
+dal = "Dallas, US"
+sjc = "San Jose, US"
+lax = "Los Angeles, US"
+
+[[rule]]
+operator = "Deutsche Telekom"
+domain = "dtag.de"
+pattern = '\.(?P<code>[a-z]{1,2})\.de\.net\.dtag\.de$'
+kind = "map"
+[rule.codes]
+f = "Frankfurt am Main, DE"
+m = "Munich, DE"
+b = "Berlin, DE"
+h = "Hamburg, DE"
+d = "Düsseldorf, DE"
+s = "Stuttgart, DE"
+k = "Köln, DE"
+l = "Leipzig, DE"
+n = "Nürnberg, DE"
+ha = "Hannover, DE"

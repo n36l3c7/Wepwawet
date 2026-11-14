@@ -6,6 +6,7 @@ validated IP literal, so it never reaches a shell as anything else.
 """
 
 import asyncio
+import json
 import shutil
 import sys
 from collections.abc import Sequence
@@ -18,7 +19,11 @@ from wepwawet.providers.measurement.base import (
     LocationSpec,
     MeasurementProvider,
     PingBatch,
+    TraceBatch,
+    TraceResult,
+    parse_mtr_json,
     parse_ping_output,
+    parse_traceroute_output,
     ping_result,
 )
 
@@ -44,6 +49,22 @@ async def run_command(argv: list[str], timeout: float = COMMAND_TIMEOUT) -> str:
     return stdout.decode(errors="replace")
 
 
+def traceroute_argv(target: Target, use_mtr: bool) -> list[str]:
+    flag = "-6" if target.address.version == 6 else "-4"
+    if use_mtr:
+        return ["mtr", flag, "--json", "--no-dns", "--report-cycles", "3", str(target.address)]
+    return ["traceroute", flag, "-n", "-q", "3", "-w", "2", str(target.address)]
+
+
+def parse_trace(output: str, use_mtr: bool) -> list[Any]:
+    if use_mtr:
+        try:
+            return parse_mtr_json(json.loads(output))
+        except ValueError:
+            return []
+    return parse_traceroute_output(output)
+
+
 def _location(settings: dict[str, Any]) -> GeoPoint | None:
     lat, lon = settings.get("lat"), settings.get("lon")
     if isinstance(lat, int | float) and isinstance(lon, int | float):
@@ -55,6 +76,7 @@ class LocalPingProvider(MeasurementProvider):
     name = "local"
     label = "This machine"
     selectable = False
+    supports_traceroute = True
     max_probes = 1
 
     def unavailable_reason(self, ctx: ProviderContext) -> str | None:
@@ -81,6 +103,26 @@ class LocalPingProvider(MeasurementProvider):
         rtts, sent, _ = parse_ping_output(output)
         probe = Probe(provider=self.name, probe_id="local", location=location, city=settings.get("city"))
         return PingBatch(provider=self.name, results=[ping_result(probe, rtts, sent or packets)])
+
+    async def traceroute(
+        self,
+        target: Target,
+        locations: Sequence[LocationSpec],
+        ctx: ProviderContext,
+        protocol: str = "ICMP",
+        port: int | None = None,
+    ) -> TraceBatch:
+        settings = ctx.config.provider(self.name).model_extra or {}
+        location = _location(settings)
+        use_mtr = shutil.which("mtr") is not None
+        if location is None or (not use_mtr and shutil.which("traceroute") is None) or sys.platform == "win32":
+            return TraceBatch(provider=self.name)
+        hops = parse_trace(await run_command(traceroute_argv(target, use_mtr), timeout=90), use_mtr)
+        probe = Probe(provider=self.name, probe_id="local", location=location, city=settings.get("city"))
+        reached = any(h.address == str(target.address) and h.rtts for h in hops)
+        return TraceBatch(
+            provider=self.name, results=[TraceResult(probe=probe, protocol="ICMP", hops=tuple(hops), reached=reached)]
+        )
 
 
 class SshPingProvider(MeasurementProvider):

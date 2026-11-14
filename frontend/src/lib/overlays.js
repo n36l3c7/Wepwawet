@@ -178,3 +178,52 @@ export function reportBounds(report, points) {
 }
 
 SOURCE_LABELS.rtt = 'RTT measurements'
+
+/** Colour tokens of the traceroute paths, cycled. */
+export const PATH_COLORS = ['accent', 'accent2', 't3', 't4', 't5']
+
+/**
+ * Traceroute paths as lines: probe, then every located hop in order, then the end point
+ * (the estimate, else the convergence router). Hops without a location are skipped.
+ */
+export function pathFeatures(report) {
+  const end = report?.estimate?.location ?? report?.convergence?.location ?? null
+  return {
+    type: 'FeatureCollection',
+    features: (report?.traceroutes ?? []).map((trace, index) => {
+      const coordinates = [[trace.probe.location.lon, trace.probe.location.lat]]
+      for (const hop of trace.hops) {
+        if (hop.location) coordinates.push([hop.location.lon, hop.location.lat])
+      }
+      if (end) coordinates.push([end.lon, end.lat])
+      return {
+        type: 'Feature',
+        properties: { index, color: PATH_COLORS[index % PATH_COLORS.length] },
+        geometry: { type: 'LineString', coordinates },
+      }
+    }),
+  }
+}
+
+/** Located hops of every path, as points. */
+export function hopFeatures(report) {
+  const features = []
+  ;(report?.traceroutes ?? []).forEach((trace, index) => {
+    for (const hop of trace.hops) {
+      if (!hop.location) continue
+      features.push({
+        type: 'Feature',
+        properties: {
+          color: PATH_COLORS[index % PATH_COLORS.length],
+          title: `${hop.hostname ?? hop.address} · ${hop.location_label ?? ''}${
+            hop.min_rtt === null ? '' : ` · ${hop.min_rtt.toFixed(1)} ms`
+          }`,
+        },
+        geometry: { type: 'Point', coordinates: [hop.location.lon, hop.location.lat] },
+      })
+    }
+  })
+  return { type: 'FeatureCollection', features }
+}
+
+SOURCE_LABELS.traceroute = 'Traceroutes'

@@ -43,6 +43,34 @@ class PingBatch:
 
 
 @dataclass(frozen=True)
+class RawHop:
+    ttl: int
+    address: str | None  # None: no reply at this TTL
+    hostname: str | None = None
+    asn: int | None = None
+    rtts: tuple[float, ...] = ()
+
+    @property
+    def min_rtt(self) -> float | None:
+        return min(self.rtts) if self.rtts else None
+
+
+@dataclass(frozen=True)
+class TraceResult:
+    probe: Probe
+    protocol: str
+    hops: tuple[RawHop, ...]
+    reached: bool
+
+
+@dataclass
+class TraceBatch:
+    provider: str
+    results: list[TraceResult] = field(default_factory=list)
+    tests_used: int = 0
+
+
+@dataclass(frozen=True)
 class Budget:
     provider: str
     unit: str  # "tests/hour" or "credits"
@@ -81,6 +109,19 @@ class MeasurementProvider(ABC):
         With ``tcp_port``, measure the TCP handshake to that port instead of ICMP echo.
         """
 
+    async def traceroute(
+        self,
+        target: Target,
+        locations: Sequence[LocationSpec],
+        ctx: ProviderContext,
+        protocol: str = "ICMP",
+        port: int | None = None,
+    ) -> TraceBatch:
+        """Trace the path to ``target`` from probes matching ``locations``. Not every provider can."""
+        return TraceBatch(provider=self.name)
+
+    supports_traceroute: ClassVar[bool] = False
+
     async def budget(self, ctx: ProviderContext) -> Budget | None:
         return None
 
@@ -98,6 +139,50 @@ def parse_ping_output(text: str) -> tuple[tuple[float, ...], int, int]:
     if totals:
         sent, received = int(totals.group(1)), int(totals.group(2))
     return rtts, sent, received
+
+
+_TRACEROUTE_LINE = re.compile(r"^\s*(\d+)\s+(.*)$")
+_HOP_ADDRESS = re.compile(r"^(\S+)")
+_HOP_RTT = re.compile(r"([\d.]+)\s*ms")
+
+
+def parse_traceroute_output(text: str) -> list[RawHop]:
+    """Hops from ``traceroute -n`` output: ``2  192.0.2.1  1.2 ms  1.1 ms  1.3 ms`` or ``3  * * *``."""
+    hops = []
+    for line in text.splitlines():
+        match = _TRACEROUTE_LINE.match(line)
+        if not match:
+            continue
+        ttl, rest = int(match.group(1)), match.group(2).strip()
+        if rest.startswith("*") and "ms" not in rest:
+            hops.append(RawHop(ttl=ttl, address=None))
+            continue
+        address_match = _HOP_ADDRESS.match(rest.replace("*", "").strip())
+        rtts = tuple(float(v) for v in _HOP_RTT.findall(rest))
+        hops.append(RawHop(ttl=ttl, address=address_match.group(1) if address_match else None, rtts=rtts))
+    return hops
+
+
+def parse_mtr_json(data: dict[str, object]) -> list[RawHop]:
+    """Hops from ``mtr --json`` (``report.hubs``): ``Best`` is the minimum RTT, ``???`` a silent hop."""
+    report = data.get("report") if isinstance(data, dict) else None
+    hubs = report.get("hubs", []) if isinstance(report, dict) else []
+    hops = []
+    for index, hub in enumerate(hubs if isinstance(hubs, list) else [], start=1):
+        if not isinstance(hub, dict):
+            continue
+        host = str(hub.get("host") or "")
+        best = hub.get("Best")
+        received = isinstance(best, int | float) and float(hub.get("Loss%") or 0) < 100
+        address = None if host in ("???", "") else host
+        hops.append(
+            RawHop(
+                ttl=int(hub.get("count") or index),
+                address=address,
+                rtts=(float(best),) if received and address and isinstance(best, int | float) else (),
+            )
+        )
+    return hops
 
 
 def ping_result(probe: Probe, rtts: Sequence[float], sent: int) -> PingResult:

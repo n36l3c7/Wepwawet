@@ -19,6 +19,9 @@ from wepwawet.providers.measurement.base import (
     MeasurementProvider,
     PingBatch,
     PingResult,
+    RawHop,
+    TraceBatch,
+    TraceResult,
     ping_result,
 )
 
@@ -68,11 +71,38 @@ def parse_results(data: dict[str, Any]) -> list[PingResult]:
     return results
 
 
+def parse_mtr_results(data: dict[str, Any], target: str, protocol: str) -> list[TraceResult]:
+    results = []
+    for item in data.get("results") or []:
+        raw_probe, result = item.get("probe") or {}, item.get("result") or {}
+        if raw_probe.get("latitude") is None or result.get("status") != "finished":
+            continue
+        hops = []
+        for ttl, hop in enumerate(result.get("hops") or [], start=1):
+            rtts = tuple(t["rtt"] for t in hop.get("timings") or [] if isinstance(t.get("rtt"), int | float))
+            asns = hop.get("asn") or []
+            hops.append(
+                RawHop(
+                    ttl=ttl,
+                    address=hop.get("resolvedAddress") or None,
+                    hostname=hop.get("resolvedHostname")
+                    if hop.get("resolvedHostname") != hop.get("resolvedAddress")
+                    else None,
+                    asn=asns[0] if asns else None,
+                    rtts=rtts,
+                )
+            )
+        reached = any(h.address == target and h.rtts for h in hops)
+        results.append(TraceResult(probe=probe_from(raw_probe), protocol=protocol, hops=tuple(hops), reached=reached))
+    return results
+
+
 class GlobalpingProvider(MeasurementProvider):
     name = "globalping"
     label = "Globalping"
     max_probes = 50
     supports_tcp = True
+    supports_traceroute = True
 
     def _headers(self, ctx: ProviderContext) -> dict[str, str]:
         headers = {"Accept-Encoding": "gzip"}
@@ -106,6 +136,33 @@ class GlobalpingProvider(MeasurementProvider):
         data = await self._wait(measurement_id, ctx)
         results = parse_results(data)
         return PingBatch(provider=self.name, results=results, reuse_key=measurement_id, tests_used=len(results))
+
+    async def traceroute(
+        self,
+        target: Target,
+        locations: Sequence[LocationSpec],
+        ctx: ProviderContext,
+        protocol: str = "ICMP",
+        port: int | None = None,
+    ) -> TraceBatch:
+        """An ``mtr`` measurement: per-hop RTT statistics and ASNs, three packets per hop."""
+        options: dict[str, Any] = {"packets": 3, "protocol": protocol.upper()}
+        if port and protocol.upper() != "ICMP":
+            options["port"] = port
+        body = {
+            "type": "mtr",
+            "target": str(target.address),
+            "locations": [location_json(spec) for spec in locations],
+            "measurementOptions": options,
+        }
+        status, created = await ctx.http.request_json(
+            self.name, "POST", f"{BASE_URL}/measurements", json=body, headers=self._headers(ctx), ok_statuses=(202, 422)
+        )
+        if status == 422:
+            return TraceBatch(provider=self.name)
+        data = await self._wait(str(created["id"]), ctx)
+        results = parse_mtr_results(data, str(target.address), protocol.upper())
+        return TraceBatch(provider=self.name, results=results, tests_used=len(results))
 
     async def _wait(self, measurement_id: str, ctx: ProviderContext) -> dict[str, Any]:
         deadline = time.monotonic() + TIMEOUT_SECONDS

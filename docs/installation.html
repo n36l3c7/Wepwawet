@@ -40,19 +40,19 @@
         <code>SHA256SUMS</code> file.
       </p>
       <h3>Debian, Ubuntu, Kali</h3>
-      <pre><code>sudo apt install ./wepwawet_0.3.0-1_amd64.deb</code></pre>
+      <pre><code>sudo apt install ./wepwawet_0.4.0-1_amd64.deb</code></pre>
       <h3>Fedora</h3>
-      <pre><code>sudo dnf install ./wepwawet-0.3.0-1.x86_64.rpm</code></pre>
+      <pre><code>sudo dnf install ./wepwawet-0.4.0-1.x86_64.rpm</code></pre>
       <h3>Arch Linux</h3>
-      <pre><code>sudo pacman -U wepwawet-0.3.0-1-x86_64.pkg.tar.zst</code></pre>
+      <pre><code>sudo pacman -U wepwawet-0.4.0-1-x86_64.pkg.tar.zst</code></pre>
       <p>
         The packages install the system libraries Qt needs. They recommend <code>mtr</code> and <code>traceroute</code>,
         which Wepwawet will use to measure from this machine.
       </p>
 
       <h3>AppImage</h3>
-      <pre><code>chmod +x Wepwawet-0.3.0-x86_64.AppImage
-./Wepwawet-0.3.0-x86_64.AppImage</code></pre>
+      <pre><code>chmod +x Wepwawet-0.4.0-x86_64.AppImage
+./Wepwawet-0.4.0-x86_64.AppImage</code></pre>
       <p>
         An AppImage needs <code>libfuse2</code>; without it, add <code>--appimage-extract-and-run</code>. It also
         expects the libraries Qt WebEngine loads. On Debian-based systems:
@@ -74,7 +74,8 @@
       </ul>
       <p>
         The same command downloads the <strong>GeoNames</strong> list of cities above 15 000 inhabitants (CC BY 4.0),
-        used to name the places inside a measured region.
+        used to name the places inside a measured region, and the airport codes (OurAirports, public domain) and
+        UN/LOCODE place codes found in router names.
       </p>
       <p>
         See <a href="configuration.html#keys">API keys</a> for where to put tokens. Even without any database, RIPEstat
@@ -112,7 +113,7 @@ uv sync --extra gui
 uv run wepwawet</code></pre>
     </main>
     <footer class="site">
-      Wepwawet 0.3.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 0.4.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

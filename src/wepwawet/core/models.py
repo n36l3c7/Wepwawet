@@ -195,6 +195,59 @@ class AnycastInfo(_Model):
     sites: tuple[AnycastSite, ...] = ()
 
 
+class GeoHint(_Model):
+    """A place named inside a router's hostname (IATA code, UN/LOCODE, city name, operator code)."""
+
+    token: str
+    kind: str  # "iata", "locode", "city", "operator"
+    name: str
+    country: str | None = None
+    point: GeoPoint
+    confidence: float = Field(ge=0, le=1)
+
+
+class HopReport(_Model):
+    ttl: int
+    address: str | None = None  # None: no reply at this TTL
+    hostname: str | None = None
+    asn: int | None = None
+    min_rtt: float | None = None
+    hints: tuple[GeoHint, ...] = ()
+    ixp: str | None = None
+    location: GeoPoint | None = None
+    location_source: str | None = None  # "hint", "ixp", "probe"
+    location_label: str | None = None
+
+
+class TracerouteReport(_Model):
+    probe: Probe
+    protocol: str
+    reached: bool
+    hops: tuple[HopReport, ...]
+    flags: tuple[str, ...] = ()
+
+
+class Convergence(_Model):
+    """The last router shared by several paths: the strongest anchor near the target."""
+
+    address: str
+    hostname: str | None = None
+    paths: int
+    of: int
+    location: GeoPoint | None = None
+    label: str | None = None
+    rtt_to_target_ms: float | None = None  # target RTT minus this hop's RTT, smallest over paths
+    max_distance_km: float | None = None
+
+
+class AccessDelay(_Model):
+    """Delay between the last network router and the target: the access line."""
+
+    delay_ms: float
+    technology: str  # "datacentre", "fibre", "cable/xDSL", "mobile or fixed wireless", "unknown"
+    paths: int
+
+
 class RunStatus(StrEnum):
     RUNNING = "running"
     DONE = "done"
@@ -216,6 +269,9 @@ class TargetReport(BaseModel):
     probes: list[ProbeResult] = Field(default_factory=list)
     region: Region | None = None
     anycast: AnycastInfo | None = None
+    traceroutes: list[TracerouteReport] = Field(default_factory=list)
+    convergence: Convergence | None = None
+    access: AccessDelay | None = None
     estimate: Estimate | None = None
 
 

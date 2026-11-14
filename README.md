@@ -10,9 +10,9 @@ Measurement-based IP geolocation for Linux: passive evidence plus ping and trace
 
 ![Wepwawet locating 193.0.6.139](docs/img/main-window.png)
 
-> **Status: v0.3.0.** Wepwawet reads every passive source about an address, pings it from about 80 probes,
-> and intersects the speed-of-light limits into a feasible region with an estimate. Traceroutes arrive in
-> v0.4.0; see [Roadmap](#roadmap).
+> **Status: v0.4.0.** Wepwawet reads every passive source about an address, pings it from about 80 probes,
+> intersects the speed-of-light limits into a feasible region, and traces the paths from the fastest probes
+> to read the routers on the way. Evidence fusion, history and export arrive in v0.5.0; see [Roadmap](#roadmap).
 
 ## What it does
 
@@ -52,17 +52,17 @@ Download the package for your distribution from the
 
 ```sh
 # Debian, Ubuntu, Kali
-sudo apt install ./wepwawet_0.3.0-1_amd64.deb
+sudo apt install ./wepwawet_0.4.0-1_amd64.deb
 
 # Fedora
-sudo dnf install ./wepwawet-0.3.0-1.x86_64.rpm
+sudo dnf install ./wepwawet-0.4.0-1.x86_64.rpm
 
 # Arch Linux
-sudo pacman -U wepwawet-0.3.0-1-x86_64.pkg.tar.zst
+sudo pacman -U wepwawet-0.4.0-1-x86_64.pkg.tar.zst
 
 # Any distribution: AppImage (needs libfuse2, or run it with --appimage-extract-and-run)
-chmod +x Wepwawet-0.3.0-x86_64.AppImage
-./Wepwawet-0.3.0-x86_64.AppImage
+chmod +x Wepwawet-0.4.0-x86_64.AppImage
+./Wepwawet-0.4.0-x86_64.AppImage
 ```
 
 The packages install the system libraries Qt needs and recommend `mtr` and `traceroute` for measurements
@@ -72,7 +72,7 @@ from this machine. The AppImage expects the same libraries on the host; the list
 ## Quickstart
 
 ```sh
-wepwawet data update        # download DB-IP Lite and the GeoNames city list (once a month)
+wepwawet data update        # download DB-IP Lite, GeoNames cities, airport and UN/LOCODE codes (monthly)
 wepwawet                    # open the window (also in the desktop menu)
 wepwawet locate ripe.net    # or locate from the terminal
 wepwawet doctor             # check the window, the configuration and the traceroute tools
@@ -108,6 +108,14 @@ fastest one and of the passive answers. Each minimum RTT bounds the distance (li
 an H3 grid, with its centre, an uncertainty radius and the GeoNames cities inside it. Probes too fast for a
 single place reveal anycast. When the target drops ICMP, the sweep is repeated as a TCP handshake to port 443.
 
+Then traceroutes from the five fastest probes read the routers on the way. Router names often contain a
+place (an airport or UN/LOCODE code, a city, an operator's own code); a name is believed only if the
+router's RTT allows it. Routers inside an exchange's peering LAN (PeeringDB) are placed at that exchange.
+The router where most paths meet is the convergence point, and the RTT step from the last router to the
+target estimates the access line (fibre, xDSL, mobile), most of which is removed from every RTT before
+the region is recomputed. Operator naming rules live in
+[`geohint_rules.toml`](src/wepwawet/data/geohint_rules.toml) and are easy to extend.
+
 Answers are cached (one day by default). The network is classified as residential, mobile, hosting, CDN,
 VPN or education from cloud ranges, PeeringDB, the AS name and PTR patterns, and the window explains
 what that means for the answer.
@@ -120,7 +128,7 @@ what that means for the answer.
 | `wepwawet gui --browser` | Open the interface in the system browser instead of a window, for machines where Qt WebEngine cannot run. |
 | `wepwawet locate TARGET [--json] [--passive]` | Locate an IP address or hostname and print the evidence (or the full JSON report); `--passive` skips the measurements. |
 | `wepwawet providers` | List the sources and whether each can run now. |
-| `wepwawet data update [--only dbip\|ipinfo\|geolite\|geonames]` | Download the free GeoIP databases and the GeoNames cities. `data status` lists them. |
+| `wepwawet data update [--only dbip\|ipinfo\|geolite\|geonames\|places]` | Download the GeoIP databases, the GeoNames cities and the place codes. `data status` lists the GeoIP databases. |
 | `wepwawet serve [--host H] [--port P]` | Start only the local server and print the address to open. |
 | `wepwawet doctor` | Check Python, configuration, directories, the window and the local traceroute tools. |
 | `wepwawet version` / `--version` | Show the version. |
@@ -150,6 +158,8 @@ sweep_probes = 48    # global sweep, then
 zoom_probes = 30     # regional zoom
 max_tests = 150      # per target
 calibrate = false    # CBG calibration against RIPE Atlas anchors
+traceroute_probes = 5
+access_correction = true  # remove most of the access delay before multilateration
 
 [providers.rdns]
 sweep = true         # PTR lookups of the /24 neighbours
@@ -211,7 +221,7 @@ requests at all.
 | 0.1.0 | Application, map, local server, CLI, Linux packages (done) |
 | 0.2.0 | Passive enrichment: GeoIP, RIPE IPmap, RIPEstat, RDAP, reverse DNS, PeeringDB, Shodan, Censys (done) |
 | 0.3.0 | Measurement providers, two-stage ping campaign, multilateration, anycast detection (done) |
-| 0.4.0 | Traceroutes, location hints from router names, IXPs, path convergence |
+| 0.4.0 | Traceroutes, location hints from router names, IXPs, path convergence (done) |
 | 0.5.0 | Evidence fusion and confidence, history and diff, export, bulk mode |
 | 1.0.0 | Accuracy benchmark, hardening, complete documentation |
 
@@ -248,4 +258,5 @@ vulnerability.
 [MIT](LICENSE). The packages bundle third-party software under its own licences: CPython (PSF), Qt and
 PySide6 (LGPLv3), MapLibre GL JS (BSD-3-Clause), Natural Earth data (public domain), Inter and JetBrains
 Mono fonts (OFL-1.1). IP geolocation by [DB-IP](https://db-ip.com) (CC BY 4.0) when the DB-IP Lite
-database is installed. City names from [GeoNames](https://www.geonames.org) (CC BY 4.0).
+database is installed. City names from [GeoNames](https://www.geonames.org) (CC BY 4.0); airport codes from
+[OurAirports](https://ourairports.com) (public domain); place codes from UN/LOCODE.

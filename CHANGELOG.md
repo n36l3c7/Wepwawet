@@ -7,6 +7,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-15
+
+Paths: Wepwawet now traces the routes to the address and reads the routers on the way.
+
+### Added
+
+- Traceroutes from the fastest probes: Globalping `mtr` (per-hop RTT and ASN), local `mtr --json`
+  or `traceroute`; TCP to the fallback port when the target only answered TCP.
+- Location hints in router hostnames: operator rules in `geohint_rules.toml` (Arelion, NTT,
+  Cogent, Hurricane Electric, Lumen, GTT, Telecom Italia Sparkle, Deutsche Telekom, Google), then
+  UN/LOCODE, city names, airport and IATA metro codes. A hint is kept only when the hop's RTT allows
+  the router to be there.
+- Exchange points: hop addresses inside PeeringDB peering LANs are placed at the exchange (the
+  prefix list is downloaded daily and matched locally).
+- Path convergence (the router nearest the target shared by most paths), access delay with the
+  likely access technology, and multilateration corrected for 80 % of the access delay.
+- Path flags: MPLS or hidden hops, RTT falling along the path, unresponsive tail.
+- Interface: traceroute paths and located routers on the map, convergence point, Hops tab with
+  per-hop names, ASNs, exchanges and places, path summary in the Summary tab.
+- Airports (OurAirports) and UN/LOCODE in `wepwawet data update` (`--only places`).
+
 ## [0.3.0] - 2026-11-15
 
 Measurements: Wepwawet now pings the address and works out where it can be.
@@ -88,7 +109,8 @@ First release: the application, without geolocation yet.
   supported distribution.
 - Documentation site in `docs/`.
 
-[Unreleased]: https://github.com/n36l3c7/Wepwawet/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/n36l3c7/Wepwawet/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/n36l3c7/Wepwawet/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/n36l3c7/Wepwawet/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/n36l3c7/Wepwawet/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/n36l3c7/Wepwawet/compare/v0.1.0...v0.1.1

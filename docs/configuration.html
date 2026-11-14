@@ -51,6 +51,8 @@ zoom_probes = 30     # regional zoom
 packets = 3
 max_tests = 150      # per target
 tcp_fallback_port = 443
+traceroute_probes = 5
+access_correction = true
 
 [providers.rdns]
 sweep = true         # PTR lookups of the /24 neighbours
@@ -158,6 +160,16 @@ enabled = false      # turn any source off</code></pre>
                 CBG calibration: the zoom probes also ping RIPE Atlas anchors of known position and get their own
                 delay-to-distance line. Costs zoom probes × anchors tests.
               </td>
+            </tr>
+            <tr>
+              <td><code>measurements.traceroute_probes</code></td>
+              <td><code>5</code></td>
+              <td>Traceroutes from the fastest probes; <code>0</code> disables them.</td>
+            </tr>
+            <tr>
+              <td><code>measurements.access_correction</code></td>
+              <td><code>true</code></td>
+              <td>Remove 80 % of the measured access delay from every RTT before computing the region.</td>
             </tr>
             <tr>
               <td><code>providers.local.lat</code>, <code>lon</code></td>
@@ -316,7 +328,7 @@ censys = "…"</code></pre>
       </div>
     </main>
     <footer class="site">
-      Wepwawet 0.3.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 0.4.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

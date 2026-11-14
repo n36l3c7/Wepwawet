@@ -4,6 +4,7 @@
 - IPinfo Lite: country and ASN, needs a free token, CC BY-SA 4.0.
 - MaxMind GeoLite2 City and ASN: need a free account ID and licence key (GeoLite EULA).
 - GeoNames cities15000: the cities used to name candidate places, CC BY 4.0.
+- OurAirports (public domain) and UN/LOCODE: place codes found in router names.
 
 Files are written atomically: a failed download never replaces a working database.
 """
@@ -23,6 +24,7 @@ import httpx
 from wepwawet.core.http import USER_AGENT
 from wepwawet.core.secrets import Secrets
 from wepwawet.data.gazetteer import download_geonames
+from wepwawet.data.places import download_places
 
 DBIP_URL = "https://download.db-ip.com/free/dbip-city-lite-{month}.mmdb.gz"
 IPINFO_URL = "https://ipinfo.io/data/ipinfo_lite.mmdb"
@@ -78,6 +80,7 @@ class GeoipUpdater:
             "ipinfo": self.update_ipinfo,
             "geolite": self.update_geolite,
             "geonames": self.update_geonames,
+            "places": self.update_places,
         }
         results = []
         for name, step in steps.items():
@@ -93,6 +96,10 @@ class GeoipUpdater:
     def update_geonames(self) -> UpdateResult:
         count = download_geonames(self.directory.parent / "gazetteer", self._client)
         return UpdateResult("geonames", "updated", f"GeoNames cities15000: {count:,} cities")
+
+    def update_places(self) -> UpdateResult:
+        airports, locodes = download_places(self.directory.parent / "gazetteer", self._client)
+        return UpdateResult("places", "updated", f"{airports:,} airports (OurAirports), {locodes:,} UN/LOCODE places")
 
     def update_dbip(self, today: date | None = None) -> UpdateResult:
         for month in _months_back(today or datetime.now(UTC).date(), 2):

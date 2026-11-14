@@ -27,6 +27,29 @@
         Versions follow Semantic Versioning.
       </p>
 
+      <h2>0.4.0 · 2026-11-15</h2>
+      <p>Paths: Wepwawet now traces the routes to the address and reads the routers on the way.</p>
+      <h3>Added</h3>
+      <ul>
+        <li>
+          Traceroutes (Globalping mtr, local mtr or traceroute) from the fastest probes, over TCP when the target drops
+          ICMP.
+        </li>
+        <li>
+          Location hints in router names: operator rules (Arelion, NTT, Cogent, Hurricane Electric, Lumen, GTT, Sparkle,
+          Deutsche Telekom, Google), UN/LOCODE, city names, airport and IATA metro codes; a hint is kept only if the
+          hop's RTT allows it.
+        </li>
+        <li>Exchange points: routers inside a PeeringDB peering LAN are placed at that exchange.</li>
+        <li>
+          Path convergence, access-delay estimate with the likely access technology, and access-corrected
+          multilateration.
+        </li>
+        <li>Path flags: MPLS or hidden hops, falling RTT (asymmetric return), unresponsive tail.</li>
+        <li>Interface: traceroute paths and located routers on the map, convergence point, Hops tab, path summary.</li>
+        <li>Airports (OurAirports) and UN/LOCODE in <code>wepwawet data update</code>.</li>
+      </ul>
+
       <h2>0.3.0 · 2026-11-15</h2>
       <p>Measurements: Wepwawet now pings the address and works out where it can be.</p>
       <h3>Added</h3>
@@ -94,7 +117,7 @@
       <p>First release: the window, the map, the local server, the command line and the Linux packages.</p>
     </main>
     <footer class="site">
-      Wepwawet 0.3.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 0.4.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

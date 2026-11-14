@@ -16,7 +16,9 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
 from wepwawet.core.geo import Bestline, fit_bestline, haversine, sol_max_distance_km
+from wepwawet.core.geohints import load_hint_data
 from wepwawet.core.http import ProviderError
+from wepwawet.core.ixp import load_ixp_index
 from wepwawet.core.models import (
     Estimate,
     Evidence,
@@ -33,15 +35,51 @@ from wepwawet.core.multilateration import (
     disks_from,
     region_and_cells,
 )
+from wepwawet.core.traceroutes import analyse_traces, estimate_access, find_convergence
 from wepwawet.data.gazetteer import FILE_NAME, candidate_cities, load_cities
 from wepwawet.providers.base import ProviderContext
-from wepwawet.providers.measurement.base import LocationSpec, MeasurementProvider, PingBatch
+from wepwawet.providers.measurement.base import (
+    LocationSpec,
+    MeasurementProvider,
+    PingBatch,
+    RawHop,
+    TraceResult,
+)
 
 # Share of the sweep per continent, roughly where probes and networks are.
 SWEEP_SHARES = (("EU", 0.27), ("NA", 0.25), ("AS", 0.2), ("SA", 0.1), ("OC", 0.1), ("AF", 0.08))
 ANCHORS_URL = "https://atlas.ripe.net/api/v2/anchors/"
 MAX_ZOOM_COUNTRIES = 4
 MIN_PHASE_TESTS = 5  # below this a phase adds too little to be worth the tests
+MAX_PTR_LOOKUPS = 120
+# Share of the measured access delay removed from every RTT: conservative, so the region never
+# shrinks past the target when one path had a slower last mile.
+ACCESS_SHARE = 0.8
+FLAG_TEXT = {
+    "mpls_or_hidden_hops": "MPLS or hidden hops (RTT jumps across silent hops)",
+    "rtt_decreases": "RTT falls along a path (asymmetric return path)",
+    "unresponsive_tail": "the last hops do not answer",
+    "target_not_reached": "a path did not reach the target",
+}
+
+
+def traceroute_locations(probes: Sequence[ProbeResult], provider: str, count: int) -> list[LocationSpec]:
+    """One location per fastest probe of ``provider``, in distinct cities."""
+    specs: list[LocationSpec] = []
+    cities: set[str] = set()
+    for result in probes:
+        probe = result.probe
+        if result.min_rtt is None or probe.provider != provider or not probe.country:
+            continue
+        key = f"{probe.city}|{probe.country}"
+        if key in cities:
+            continue
+        cities.add(key)
+        specs.append(LocationSpec(country=probe.country, city=probe.city, asn=probe.asn, limit=1))
+        if len(specs) >= count:
+            break
+    return specs
+
 
 Log = Callable[[str, str, str], None]
 Progress = Callable[[], None]
@@ -209,6 +247,13 @@ class Campaign:
             await self._calibrate(report, primary, state, countries)
             self._finish_geometry(report)
             progress()
+
+        # 4. Traceroutes from the fastest probes: hop locations, convergence, access delay.
+        tracers = [p for p in usable if p.supports_traceroute]
+        if tracers and cfg.traceroute_probes:
+            await self._traceroutes(report, tracers, state)
+            self._finish_geometry(report)
+            progress()
         self._log("info", "measure", f"Measurements used {state.tests_used} tests")
 
     async def _tcp_sweep(
@@ -237,13 +282,142 @@ class Campaign:
             return False
         return True
 
-    def _allowance(self, state: CampaignState, wanted: int) -> int:
+    async def _traceroutes(
+        self, report: TargetReport, tracers: Sequence[MeasurementProvider], state: CampaignState
+    ) -> None:
+        cfg = self._ctx.config.measurements
+        target = report.target
+        protocol, port = ("TCP", state.tcp_port) if state.tcp_port else ("ICMP", None)
+        traces: list[TraceResult] = []
+        for provider in tracers:
+            if provider.selectable:
+                specs = traceroute_locations(report.probes, provider.name, cfg.traceroute_probes)
+                count = self._allowance(state, len(specs), minimum=1)
+                if not count:
+                    continue
+                self._log("info", provider.name, f"Traceroutes ({protocol}) from the {count} fastest probes")
+                specs = specs[:count]
+            else:
+                specs = []
+            try:
+                batch = await provider.traceroute(target, specs, self._ctx, protocol=protocol, port=port)
+            except ProviderError as exc:
+                self._log("error", provider.name, exc.message)
+                continue
+            state.tests_used += batch.tests_used
+            traces.extend(batch.results)
+        if not traces:
+            return
+        traces = await self._with_hostnames(traces)
+        hints = load_hint_data(self._ctx.paths.data_dir / "gazetteer")
+        ixps = await load_ixp_index(self._ctx, hints)
+        address = str(target.address)
+        speed = cfg.speed_km_per_ms
+        report.traceroutes = analyse_traces(traces, address, hints, ixps, speed)
+        report.convergence = find_convergence(report.traceroutes, address, speed)
+        report.access = estimate_access(report.traceroutes, address, report.classification)
+        self._trace_evidence(report)
+
+    async def _with_hostnames(self, traces: list[TraceResult]) -> list[TraceResult]:
+        """Fill in PTR names for hops that came without one (local mtr runs with --no-dns)."""
+        missing = sorted({h.address for t in traces for h in t.hops if h.address and not h.hostname})[:MAX_PTR_LOOKUPS]
+        cache = self._ctx.http.cache
+        names: dict[str, str | None] = {}
+        for address in missing:
+            cached = cache.get("hop-ptr", address)
+            if cached is None:
+                try:
+                    found = await self._ctx.dns.ptr(ipaddress.ip_address(address))
+                except ValueError:
+                    found = []
+                cached = {"name": found[0] if found else None}
+                cache.set("hop-ptr", address, cached, self._ctx.http.ttl_for("rdns"))
+            names[address] = cached.get("name")
+        return [
+            TraceResult(
+                probe=t.probe,
+                protocol=t.protocol,
+                reached=t.reached,
+                hops=tuple(
+                    RawHop(
+                        ttl=h.ttl,
+                        address=h.address,
+                        hostname=h.hostname or names.get(h.address or ""),
+                        asn=h.asn,
+                        rtts=h.rtts,
+                    )
+                    for h in t.hops
+                ),
+            )
+            for t in traces
+        ]
+
+    def _trace_evidence(self, report: TargetReport) -> None:
+        report.evidence = [e for e in report.evidence if e.source != "traceroute"]
+        conv = report.convergence
+        if conv is not None:
+            where = f" ({conv.label})" if conv.label else ""
+            gap = f", {conv.rtt_to_target_ms:.1f} ms before the target" if conv.rtt_to_target_ms is not None else ""
+            report.evidence.append(
+                Evidence(
+                    source="traceroute",
+                    kind=EvidenceKind.SOFT if conv.location else EvidenceKind.INFO,
+                    label="Convergence",
+                    summary=f"{conv.paths} of {conv.of} paths converge at {conv.hostname or conv.address}{where}{gap}",
+                    point=conv.location,
+                    radius_km=conv.max_distance_km if conv.location else None,
+                    weight=0.7,
+                    details=conv.model_dump(mode="json"),
+                )
+            )
+        located = [
+            (t, h)
+            for t in report.traceroutes
+            for h in reversed(t.hops)
+            if h.location is not None and h.address != str(report.target.address)
+        ]
+        if located:
+            trace, hop = located[0]
+            report.evidence.append(
+                Evidence(
+                    source="traceroute",
+                    kind=EvidenceKind.SOFT,
+                    label="Last located router",
+                    summary=f"Last located router: {hop.hostname or hop.address} in {hop.location_label} "
+                    f"(from {'its IXP' if hop.location_source == 'ixp' else 'its name'})",
+                    point=hop.location,
+                    weight=0.5,
+                    details={"address": hop.address, "hostname": hop.hostname, "source": hop.location_source},
+                )
+            )
+        if report.access is not None:
+            access = report.access
+            report.evidence.append(
+                Evidence(
+                    source="traceroute",
+                    kind=EvidenceKind.INFO,
+                    summary=f"Access delay {access.delay_ms:.1f} ms ({access.paths} paths): {access.technology}",
+                    details=access.model_dump(mode="json"),
+                )
+            )
+        flags = sorted({flag for t in report.traceroutes for flag in t.flags})
+        if flags:
+            report.evidence.append(
+                Evidence(
+                    source="traceroute",
+                    kind=EvidenceKind.INFO,
+                    summary="Path oddities: " + ", ".join(FLAG_TEXT.get(f, f) for f in flags),
+                    details={"flags": flags},
+                )
+            )
+
+    def _allowance(self, state: CampaignState, wanted: int, minimum: int = MIN_PHASE_TESTS) -> int:
         """How many tests a phase may use: ``wanted``, shrunk to the budget left; 0 when too few remain."""
         if wanted <= 0:
             return 0
         left = max(0, state.limit - state.tests_used)
         allowed = min(wanted, left)
-        if allowed < MIN_PHASE_TESTS:
+        if allowed < min(minimum, wanted):
             self._log("info", "measure", f"Skipping a phase: {left} tests left in the budget")
             return 0
         if allowed < wanted:
@@ -310,7 +484,19 @@ class Campaign:
 
     def _finish_geometry(self, report: TargetReport) -> None:
         """Region, anycast verdict, hard evidence and provisional estimate from the probes so far."""
-        disks = disks_from([r for r in report.probes if r.min_rtt is not None])
+        probes = [r for r in report.probes if r.min_rtt is not None]
+        correction = self._access_correction(report)
+        if correction:
+            speed = self._ctx.config.measurements.speed_km_per_ms
+            probes = [
+                r
+                if r.calibrated
+                else r.model_copy(
+                    update={"max_distance_km": sol_max_distance_km(max(0.0, (r.min_rtt or 0) - correction), speed)}
+                )
+                for r in probes
+            ]
+        disks = disks_from(probes)
         if not disks:
             return
         anycast = detect_anycast(disks)
@@ -326,9 +512,18 @@ class Campaign:
         if cities:
             region = region.model_copy(update={"candidates": tuple(candidate_cities(cities, region, cells))})
         report.region = region
-        self._add_evidence(report, region, anycast.detected, len(disks))
+        self._add_evidence(report, region, anycast.detected, len(disks), correction)
 
-    def _add_evidence(self, report: TargetReport, region: Region, anycast: bool, probes: int) -> None:
+    def _access_correction(self, report: TargetReport) -> float:
+        """RTT to remove from every probe: most of the access delay, which every path includes."""
+        access = report.access
+        if not self._ctx.config.measurements.access_correction or access is None or access.delay_ms < 0.5:
+            return 0.0
+        return round(ACCESS_SHARE * access.delay_ms, 2)
+
+    def _add_evidence(
+        self, report: TargetReport, region: Region, anycast: bool, probes: int, correction: float = 0.0
+    ) -> None:
         best = next((r for r in report.probes if r.min_rtt is not None), None)
         top = region.candidates[0] if region.candidates else None
         where = f"{top.name}, {top.country}" if top else f"{region.centroid.lat:.2f}, {region.centroid.lon:.2f}"
@@ -365,6 +560,9 @@ class Campaign:
             confidence=confidence,
             city=top.name if top else None,
             country=top.country if top else None,
-            explanation=(f"Centre of the {region.area_km2:,.0f} km² region allowed by {probes} RTT measurements.",),
+            explanation=(
+                f"Centre of the {region.area_km2:,.0f} km² region allowed by {probes} RTT measurements"
+                + (f", after removing {correction:.1f} ms of access delay." if correction else "."),
+            ),
             anycast=anycast,
         )

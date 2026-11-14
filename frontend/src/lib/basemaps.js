@@ -25,6 +25,7 @@ export function readPalette(element = document.documentElement) {
     line: v('line'),
     lineSoft: v('line-soft'),
     sunken: v('sunken'),
+    canvas: v('canvas'),
     fgMuted: v('fg-muted'),
     fgSubtle: v('fg-subtle'),
     accent: v('accent'),
@@ -35,6 +36,9 @@ export function readPalette(element = document.documentElement) {
     rtt3: v('rtt3'),
     rtt4: v('rtt4'),
     rtt5: v('rtt5'),
+    t3: v('t3'),
+    t4: v('t4'),
+    t5: v('t5'),
   }
 }
 

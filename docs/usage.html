@@ -99,6 +99,33 @@
         Globalping token doubles the limit.
       </p>
 
+      <h2>Traceroutes</h2>
+      <p>
+        After the pings, Wepwawet traces the path from the five fastest probes (over TCP port 443 when the target only
+        answered TCP). For every router on the way:
+      </p>
+      <ul>
+        <li>
+          its name is read for a place: an operator's own convention (rules in <code>geohint_rules.toml</code>), a
+          UN/LOCODE (<code>itmil01</code>), a city (<code>amsterdam</code>) or an airport code (<code>fra1</code>);
+        </li>
+        <li>
+          a name is believed only if the router's RTT allows it: a router 2 ms from the probe cannot be 1 000 km away;
+        </li>
+        <li>an address inside an exchange point's peering LAN (PeeringDB) places the router at that exchange.</li>
+      </ul>
+      <p>
+        The router nearest the target that most paths share is the <strong>convergence</strong> point, drawn as a ring.
+        The RTT step from the last router to the target is the <strong>access delay</strong>: under 0.5 ms looks like a
+        data centre, 1 to 3 ms like fibre, more like xDSL, cable or mobile. Every probe's RTT includes it, so most of it
+        is removed before the region is recomputed, which tightens the estimate.
+      </p>
+      <p>
+        The <strong>Hops</strong> tab lists every path hop by hop, with the place each router name suggests and why it
+        was kept or ruled out. Paths are flagged when the RTT jumps across silent hops (MPLS), falls along the path
+        (asymmetric return) or never reaches the target.
+      </p>
+
       <h2>Sources</h2>
       <div class="table-wrap">
         <table>
@@ -207,7 +234,7 @@ wepwawet serve            # server only; open the printed address yourself</code
       </p>
     </main>
     <footer class="site">
-      Wepwawet 0.3.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 0.4.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

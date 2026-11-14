@@ -56,6 +56,11 @@
   --color-rtt4: #8a5a2b;
   --color-rtt5: #4d3a24;
 
+  /* Categorical colours of traceroute paths (with accent and accent2) */
+  --color-t3: #d2a8ff;
+  --color-t4: #79c0ff;
+  --color-t5: #ff9bce;
+
   /* Semantic, identical in every palette */
   --color-good: #56d364;
   --color-warn: #f0883e;
@@ -216,4 +221,28 @@ body {
 }
 .wpw-popup .maplibregl-popup-tip {
   display: none;
+}
+
+/* Convergence point: a ring with its label */
+.wpw-convergence {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-accent2);
+  border: 2px solid var(--color-canvas);
+  box-shadow: 0 0 0 2px var(--color-accent2);
+}
+.wpw-convergence > span {
+  position: absolute;
+  left: 22px;
+  top: -1px;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-accent2);
+  text-shadow:
+    0 0 3px var(--color-sunken),
+    0 0 3px var(--color-sunken);
 }

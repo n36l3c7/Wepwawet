@@ -127,3 +127,31 @@ test('bounds follow the estimate when there is one', () => {
   assert.ok(west < 9.2 && east > 9.2 && south < 45.4 && north > 45.4)
   assert.ok(east - west < 2)
 })
+
+import { hopFeatures, pathFeatures } from './overlays.js'
+
+test('paths run from the probe through located hops to the estimate', () => {
+  const report = {
+    estimate: { location: { lat: 45.46, lon: 9.19 }, uncertainty_km: 20 },
+    traceroutes: [
+      {
+        probe: { location: { lat: 50.1, lon: 8.7 } },
+        hops: [
+          { location: null, hostname: 'gw', min_rtt: 0.4 },
+          { location: { lat: 47.4, lon: 8.5 }, hostname: 'zrh', location_label: 'Zurich, CH', min_rtt: 3.2 },
+        ],
+      },
+    ],
+  }
+  const [path] = pathFeatures(report).features
+  assert.deepEqual(path.geometry.coordinates, [
+    [8.7, 50.1],
+    [8.5, 47.4],
+    [9.19, 45.46],
+  ])
+  assert.equal(path.properties.color, 'accent')
+  const hops = hopFeatures(report).features
+  assert.equal(hops.length, 1)
+  assert.equal(hops[0].properties.title, 'zrh · Zurich, CH · 3.2 ms')
+  assert.deepEqual(pathFeatures(null).features, [])
+})

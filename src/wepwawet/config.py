@@ -74,6 +74,10 @@ class MeasurementsConfig(_Section):
     max_tests: int = Field(default=150, ge=0)
     # CBG calibration: ping RIPE Atlas anchors from the zoom probes and fit a delay-distance line per probe.
     calibrate: bool = False
+    # Traceroutes from the fastest probes, after the pings (0 disables them).
+    traceroute_probes: int = Field(default=5, ge=0, le=20)
+    # Subtract most of the estimated access delay from every RTT before multilateration.
+    access_correction: bool = True
     calibration_anchors: int = Field(default=4, ge=1, le=20)
 
 

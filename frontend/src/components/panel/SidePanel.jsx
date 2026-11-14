@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { SOURCE_LABELS, groupEvidence, rttBand } from '../../lib/overlays.js'
+import { PATH_COLORS, SOURCE_LABELS, groupEvidence, rttBand } from '../../lib/overlays.js'
 import AsciiJackal from '../ui/AsciiJackal.jsx'
 
 const TABS = [
   { id: 'summary', label: 'Summary' },
   { id: 'evidence', label: 'Evidence' },
-  { id: 'hops', label: 'Hops', from: '0.4.0', what: 'Traceroute hops with PTR, ASN and location hints' },
+  { id: 'hops', label: 'Hops' },
   { id: 'probes', label: 'Probes' },
   { id: 'raw', label: 'Raw' },
   { id: 'history', label: 'History', from: '0.5.0', what: 'Past runs and their differences' },
@@ -57,6 +57,7 @@ function Idle() {
           <li>Classifies the network (residential, mobile, hosting, CDN) to say what the answer can mean.</li>
           <li>Pings the target from about 50 probes worldwide, then about 30 near the fastest ones.</li>
           <li>Intersects the speed-of-light disks into a feasible region and detects anycast.</li>
+          <li>Traces the paths from the fastest probes and reads router names for their cities.</li>
         </ul>
       </section>
       <section className="grid gap-2">
@@ -249,6 +250,122 @@ function Probes({ report }) {
   )
 }
 
+const FLAG_TEXT = {
+  mpls_or_hidden_hops: 'MPLS or hidden hops',
+  rtt_decreases: 'RTT falls along the path (asymmetric return)',
+  unresponsive_tail: 'the last hops do not answer',
+  target_not_reached: 'the target did not answer',
+}
+
+function Hops({ report }) {
+  const [selected, setSelected] = useState(0)
+  const traces = report?.traceroutes ?? []
+  if (!traces.length) {
+    return <p className="text-fg-muted">No traceroutes yet. They run from the fastest probes after the pings.</p>
+  }
+  const trace = traces[Math.min(selected, traces.length - 1)]
+  const target = report.target.address
+  return (
+    <>
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Path">
+        {traces.map((t, i) => (
+          <button
+            key={`${t.probe.provider}-${t.probe.probe_id}`}
+            type="button"
+            aria-pressed={i === selected}
+            onClick={() => setSelected(i)}
+            className={[
+              'border px-2 py-0.5 font-mono text-[11px]',
+              i === selected ? 'border-current' : 'border-line opacity-70',
+            ].join(' ')}
+            style={{ color: `var(--color-${PATH_COLORS[i % PATH_COLORS.length]})` }}
+          >
+            {t.probe.city || t.probe.probe_id}
+          </button>
+        ))}
+      </div>
+      <p className="text-[12px] text-fg-muted">
+        {trace.protocol} from {[trace.probe.city, trace.probe.country].filter(Boolean).join(', ')}
+        {trace.reached ? ' · reached the target' : ''}
+        {trace.flags.length ? ` · ${trace.flags.map((f) => FLAG_TEXT[f] ?? f).join(', ')}` : ''}
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse font-mono text-[11.5px] tabular-nums">
+          <thead>
+            <tr className="text-left text-[10px] uppercase tracking-wide text-fg-subtle">
+              <th className="border-b border-line px-1 py-1 font-medium">#</th>
+              <th className="border-b border-line px-1 py-1 font-medium">Hop</th>
+              <th className="border-b border-line px-1 py-1 text-right font-medium">RTT</th>
+              <th className="border-b border-line px-1 py-1 font-medium">Where</th>
+            </tr>
+          </thead>
+          <tbody>
+            {trace.hops.map((hop) => {
+              const converge = report.convergence?.address && hop.address === report.convergence.address
+              const isTarget = hop.address === target
+              return (
+                <tr key={hop.ttl} className={converge ? 'bg-accent2-soft' : isTarget ? 'bg-accent-soft' : ''}>
+                  <td className="border-b border-line-soft px-1 py-1 text-fg-subtle">{hop.ttl}</td>
+                  <td className="max-w-[170px] break-all border-b border-line-soft px-1 py-1">
+                    {hop.address ? (hop.hostname ?? hop.address) : <span className="text-fg-subtle">* no reply</span>}
+                    <span className="block text-[10.5px] text-fg-subtle">
+                      {[hop.hostname ? hop.address : null, hop.asn ? `AS${hop.asn}` : null, hop.ixp]
+                        .filter(Boolean)
+                        .join(' · ')}
+                      {isTarget ? ' target' : ''}
+                      {converge ? ' convergence' : ''}
+                    </span>
+                  </td>
+                  <td className="border-b border-line-soft px-1 py-1 text-right">
+                    {hop.min_rtt === null ? '—' : `${hop.min_rtt.toFixed(1)} ms`}
+                  </td>
+                  <td className="border-b border-line-soft px-1 py-1">
+                    {hop.location_label ? (
+                      <>
+                        <span className="text-accent-fg">{hop.location_label}</span>
+                        <span className="block text-[10.5px] text-fg-subtle">
+                          {hop.location_source === 'ixp' ? 'IXP' : `name: ${hop.hints[0]?.token ?? ''}`}
+                        </span>
+                      </>
+                    ) : hop.hints.length ? (
+                      <span className="text-fg-subtle" title="The RTT rules this hint out">
+                        {hop.hints[0].name}? (too far)
+                      </span>
+                    ) : null}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
+function PathSummary({ report }) {
+  const conv = report.convergence
+  const access = report.access
+  if (!conv && !access) return null
+  return (
+    <section className="grid gap-2">
+      <Heading>Paths</Heading>
+      <KeyValues
+        rows={[
+          [
+            'convergence',
+            conv
+              ? `${conv.paths}/${conv.of} paths at ${conv.hostname ?? conv.address}${conv.label ? ` (${conv.label})` : ''}`
+              : null,
+          ],
+          ['to target', conv?.rtt_to_target_ms != null ? `${conv.rtt_to_target_ms.toFixed(1)} ms after it` : null],
+          ['access', access ? `${access.delay_ms.toFixed(1)} ms · ${access.technology}` : null],
+        ]}
+      />
+    </section>
+  )
+}
+
 function Summary({ report, running }) {
   const net = report.network ?? {}
   const located = report.evidence.filter((e) => e.point && e.source !== 'peeringdb')
@@ -272,6 +389,7 @@ function Summary({ report, running }) {
       <Anycast anycast={report.anycast} />
       {report.estimate ? <EstimateCard report={report} /> : null}
       <Candidates region={report.region} />
+      <PathSummary report={report} />
       <section className="grid gap-2.5 border border-line bg-canvas p-3">
         <div>
           <div className="min-w-0">
@@ -395,6 +513,8 @@ export default function SidePanel({ run, targetIndex, onTargetChange }) {
         {current.what} will appear here from v{current.from}.
       </p>
     )
+  } else if (tab === 'hops') {
+    body = <Hops report={report} />
   } else if (tab === 'probes') {
     body = <Probes report={report} />
   } else if (tab === 'raw') {

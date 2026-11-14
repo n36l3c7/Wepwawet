@@ -46,9 +46,10 @@
         on a map. Named after the Egyptian god Wepwawet, the jackal "opener of the ways".
       </p>
       <div class="note">
-        <strong>v0.3.0: measurements.</strong> After the passive sources, Wepwawet pings the address from about 80
-        probes around the world, intersects the speed-of-light limits into a feasible region, names the cities inside it
-        and detects anycast. Traceroutes arrive in v0.4.0.
+        <strong>v0.4.0: paths.</strong> Wepwawet reads the passive sources, pings the address from about 80 probes,
+        intersects the speed-of-light limits into a feasible region, then traces the paths from the fastest probes:
+        router names give their cities, exchange points are recognised, and the router where the paths meet anchors the
+        estimate.
       </div>
       <img
         src="img/main-window.png"
@@ -122,7 +123,7 @@
             </tr>
             <tr>
               <td>0.4.0</td>
-              <td>Traceroutes, location hints from router names, IXPs, path convergence</td>
+              <td>Traceroutes, location hints from router names, IXPs, path convergence (done)</td>
             </tr>
             <tr>
               <td>0.5.0</td>
@@ -137,7 +138,7 @@
       </div>
     </main>
     <footer class="site">
-      Wepwawet 0.3.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 0.4.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>
