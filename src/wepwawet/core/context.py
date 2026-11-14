@@ -17,6 +17,10 @@ from wepwawet.providers.enrichment.rdap import RdapProvider
 from wepwawet.providers.enrichment.rdns import ReverseDnsProvider
 from wepwawet.providers.enrichment.ripestat import RipeStatProvider
 from wepwawet.providers.enrichment.shodan import ShodanProvider
+from wepwawet.providers.measurement.base import MeasurementProvider
+from wepwawet.providers.measurement.globalping import GlobalpingProvider
+from wepwawet.providers.measurement.local import LocalPingProvider, SshPingProvider
+from wepwawet.providers.measurement.ripe_atlas import RipeAtlasProvider
 
 ALL_ENRICHMENT: list[type[EnrichmentProvider]] = [
     GeoipProvider,
@@ -30,6 +34,19 @@ ALL_ENRICHMENT: list[type[EnrichmentProvider]] = [
     CensysProvider,
     ClassifyProvider,
 ]
+
+
+# The first available selectable provider leads the campaign: Globalping is free, so it comes first.
+ALL_MEASUREMENT: list[type[MeasurementProvider]] = [
+    GlobalpingProvider,
+    RipeAtlasProvider,
+    LocalPingProvider,
+    SshPingProvider,
+]
+
+
+def enabled_measurement(config: Config) -> list[MeasurementProvider]:
+    return [cls() for cls in ALL_MEASUREMENT if config.provider(cls.name).enabled]
 
 
 def build_context(config: Config, paths: AppPaths, log: LogFn | None = None) -> ProviderContext:

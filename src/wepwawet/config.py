@@ -61,6 +61,22 @@ class LoggingConfig(_Section):
     level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
 
+class MeasurementsConfig(_Section):
+    enabled: bool = True
+    # One-way speed of light in fibre used for the distance bound (km per ms); 200 is about 2/3 c.
+    speed_km_per_ms: float = Field(default=200.0, gt=50, le=300)
+    sweep_probes: int = Field(default=48, ge=0, le=500)
+    zoom_probes: int = Field(default=30, ge=0, le=500)
+    packets: int = Field(default=3, ge=1, le=16)
+    # When no probe gets an ICMP reply, measure the TCP handshake to this port instead (0 disables it).
+    tcp_fallback_port: int = Field(default=443, ge=0, le=65535)
+    # Most tests (Globalping) or credits (RIPE Atlas, per provider max_credits) one target may use.
+    max_tests: int = Field(default=150, ge=0)
+    # CBG calibration: ping RIPE Atlas anchors from the zoom probes and fit a delay-distance line per probe.
+    calibrate: bool = False
+    calibration_anchors: int = Field(default=4, ge=1, le=20)
+
+
 class ProviderSettings(BaseModel):
     """``[providers.<name>]``: ``enabled`` plus options specific to that provider."""
 
@@ -77,6 +93,7 @@ class Config(_Section):
     map: MapConfig = Field(default_factory=MapConfig)
     cache: CacheConfig = Field(default_factory=CacheConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    measurements: MeasurementsConfig = Field(default_factory=MeasurementsConfig)
     providers: dict[str, ProviderSettings] = Field(default_factory=dict)
 
     def provider(self, name: str) -> ProviderSettings:

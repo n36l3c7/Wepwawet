@@ -27,6 +27,37 @@
         Versions follow Semantic Versioning.
       </p>
 
+      <h2>0.3.0 · 2026-11-15</h2>
+      <p>Measurements: Wepwawet now pings the address and works out where it can be.</p>
+      <h3>Added</h3>
+      <ul>
+        <li>
+          Measurement sources: Globalping (free, optional token), RIPE Atlas (only with a credit budget), this machine
+          and your servers over SSH.
+        </li>
+        <li>
+          Two-stage ping campaign: a global sweep, then a regional zoom near the fastest probes and the passive answers;
+          TCP fallback when the target drops ICMP; test budget shared with Globalping's hourly limit.
+        </li>
+        <li>
+          Multilateration on an H3 grid: feasible region, centre, uncertainty radius and the GeoNames cities inside it;
+          optional CBG calibration against RIPE Atlas anchors.
+        </li>
+        <li>Anycast detection from speed-of-light violations.</li>
+        <li>
+          Interface: probes coloured by RTT, RTT disks, region, estimate with uncertainty and confidence, layer toggles,
+          Probes tab, budget meter.
+        </li>
+        <li>
+          <code>wepwawet locate --passive</code>, <code>/api/budget</code>, GeoNames in
+          <code>wepwawet data update</code>.
+        </li>
+      </ul>
+      <h3>Fixed</h3>
+      <ul>
+        <li><code>wepwawet locate --json</code> always writes UTF-8.</li>
+      </ul>
+
       <h2>0.2.0 · 2026-11-15</h2>
       <p>Passive evidence: Wepwawet now looks addresses up.</p>
       <h3>Added</h3>
@@ -63,7 +94,7 @@
       <p>First release: the window, the map, the local server, the command line and the Linux packages.</p>
     </main>
     <footer class="site">
-      Wepwawet 0.2.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 0.3.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

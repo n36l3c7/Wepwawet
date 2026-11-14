@@ -24,7 +24,64 @@ function ProviderChip({ provider }) {
   )
 }
 
-export default function TopBar({ version, running, providers, error, onRun, onStop }) {
+/** Ready sources as chips; the unavailable ones folded into one chip that lists why. */
+function SourceSummary({ providers }) {
+  const ready = providers.filter((p) => !p.reason)
+  const off = providers.filter((p) => p.reason)
+  return (
+    <div className="flex flex-wrap gap-1.5" aria-label="Data sources">
+      {ready.map((p) => (
+        <ProviderChip key={p.name} provider={p} />
+      ))}
+      {off.length ? (
+        <details className="relative">
+          <summary className="cursor-pointer list-none border border-line bg-panel px-2 py-0.5 font-mono text-[11px] text-fg-subtle hover:text-fg">
+            +{off.length} off
+          </summary>
+          <ul className="absolute right-0 z-20 mt-1 grid w-[340px] gap-1.5 border border-line bg-sunken p-2.5 text-[12px] shadow-lg">
+            {off.map((p) => (
+              <li key={p.name} className="grid gap-0.5">
+                <b className="font-mono text-[11.5px] font-medium">{p.label}</b>
+                <span className="text-fg-muted">{p.reason}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </div>
+  )
+}
+
+function BudgetMeter({ budget }) {
+  if (budget.remaining === null || budget.limit === null) return null
+  const used = Math.max(0, budget.limit - budget.remaining)
+  const share = budget.limit ? Math.min(100, (used / budget.limit) * 100) : 0
+  const tone = share > 85 ? 'bg-high' : share > 60 ? 'bg-warn' : 'bg-accent'
+  const label = budget.provider === 'globalping' ? 'Globalping / hour' : 'RIPE Atlas credits'
+  return (
+    <div
+      className="grid min-w-[170px] gap-0.5 font-mono text-[11px] text-fg-muted"
+      title={`${budget.remaining} ${budget.unit} left`}
+    >
+      <div className="flex justify-between gap-2">
+        <span>{label}</span>
+        <span className="tabular-nums">{budget.remaining} left</span>
+      </div>
+      <div
+        className="relative h-[5px] bg-line-soft"
+        role="meter"
+        aria-label={`${label} used`}
+        aria-valuemin="0"
+        aria-valuemax={budget.limit}
+        aria-valuenow={used}
+      >
+        <span className={`absolute inset-y-0 left-0 ${tone}`} style={{ width: `${share}%` }} />
+      </div>
+    </div>
+  )
+}
+
+export default function TopBar({ version, running, providers, budgets = [], error, onRun, onStop }) {
   const [query, setQuery] = useState('')
   const mood = running ? 'animated' : error ? 'x' : 'open'
 
@@ -81,11 +138,10 @@ export default function TopBar({ version, running, providers, error, onRun, onSt
           </p>
         ) : null}
       </form>
-      <div className="flex flex-wrap gap-1.5" aria-label="Data sources">
-        {providers.map((p) => (
-          <ProviderChip key={p.name} provider={p} />
-        ))}
-      </div>
+      <SourceSummary providers={providers} />
+      {budgets.map((b) => (
+        <BudgetMeter key={b.provider} budget={b} />
+      ))}
     </header>
   )
 }

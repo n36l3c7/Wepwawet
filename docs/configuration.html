@@ -44,8 +44,30 @@ ttl_seconds = { rdap = 604800 }   # per-source overrides
 [logging]
 level = "INFO"       # DEBUG, INFO, WARNING, ERROR
 
+[measurements]
+enabled = true
+sweep_probes = 48    # global sweep
+zoom_probes = 30     # regional zoom
+packets = 3
+max_tests = 150      # per target
+tcp_fallback_port = 443
+
 [providers.rdns]
 sweep = true         # PTR lookups of the /24 neighbours
+
+[providers.local]    # ping from this machine too
+lat = 45.46
+lon = 9.19
+
+[[providers.ssh.hosts]]   # and from your own servers
+name = "vps-fra"
+host = "vps.example.net"
+user = "probe"
+lat = 50.11
+lon = 8.68
+
+[providers.ripe_atlas]
+max_credits = 300    # RIPE Atlas spends credits only with a budget
 
 [providers.shodan]
 enabled = false      # turn any source off</code></pre>
@@ -100,12 +122,70 @@ enabled = false      # turn any source off</code></pre>
               <td>Log level for the terminal and the log file.</td>
             </tr>
             <tr>
+              <td><code>measurements.enabled</code></td>
+              <td><code>true</code></td>
+              <td>Run the ping campaign after the passive sources.</td>
+            </tr>
+            <tr>
+              <td><code>measurements.sweep_probes</code>, <code>zoom_probes</code></td>
+              <td><code>48</code>, <code>30</code></td>
+              <td>Probes in the global sweep and in the regional zoom.</td>
+            </tr>
+            <tr>
+              <td><code>measurements.packets</code></td>
+              <td><code>3</code></td>
+              <td>Pings per probe; the minimum RTT is used.</td>
+            </tr>
+            <tr>
+              <td><code>measurements.max_tests</code></td>
+              <td><code>150</code></td>
+              <td>Most tests one target may use (also limited by what Globalping has left this hour).</td>
+            </tr>
+            <tr>
+              <td><code>measurements.speed_km_per_ms</code></td>
+              <td><code>200</code></td>
+              <td>One-way speed in fibre for the distance bound (about 2/3 of light in vacuum).</td>
+            </tr>
+            <tr>
+              <td><code>measurements.tcp_fallback_port</code></td>
+              <td><code>443</code></td>
+              <td>TCP port to measure when the target drops ICMP; <code>0</code> disables the fallback.</td>
+            </tr>
+            <tr>
+              <td><code>measurements.calibrate</code></td>
+              <td><code>false</code></td>
+              <td>
+                CBG calibration: the zoom probes also ping RIPE Atlas anchors of known position and get their own
+                delay-to-distance line. Costs zoom probes × anchors tests.
+              </td>
+            </tr>
+            <tr>
+              <td><code>providers.local.lat</code>, <code>lon</code></td>
+              <td>unset</td>
+              <td>Where this machine is; needed to use it as a probe.</td>
+            </tr>
+            <tr>
+              <td><code>providers.ssh.hosts</code></td>
+              <td><code>[]</code></td>
+              <td>
+                Your servers: <code>name</code>, <code>host</code>, optional <code>user</code> and <code>port</code>,
+                <code>lat</code>, <code>lon</code>. Wepwawet runs <code>ping</code> on them over SSH (key authentication
+                only).
+              </td>
+            </tr>
+            <tr>
+              <td><code>providers.ripe_atlas.max_credits</code></td>
+              <td><code>0</code></td>
+              <td>RIPE Atlas credits one measurement may spend; <code>0</code> keeps RIPE Atlas off.</td>
+            </tr>
+            <tr>
               <td><code>providers.&lt;name&gt;.enabled</code></td>
               <td><code>true</code></td>
               <td>
                 Turn a source off: <code>geoip</code>, <code>ipmap</code>, <code>ripestat</code>, <code>rdap</code>,
                 <code>rdns</code>, <code>internetdb</code>, <code>shodan</code>, <code>censys</code>,
-                <code>peeringdb</code>, <code>classify</code>.
+                <code>peeringdb</code>, <code>classify</code>, <code>globalping</code>, <code>ripe_atlas</code>,
+                <code>local</code>, <code>ssh</code>.
               </td>
             </tr>
             <tr>
@@ -165,9 +245,14 @@ censys = "…"</code></pre>
               <td>Censys Platform host lookups (personal access token)</td>
             </tr>
             <tr>
-              <td><code>globalping</code>, <code>ripe_atlas</code></td>
-              <td><code>WEPWAWET_GLOBALPING</code>, <code>WEPWAWET_RIPE_ATLAS</code></td>
-              <td>Measurements, from v0.3.0</td>
+              <td><code>globalping</code></td>
+              <td><code>WEPWAWET_GLOBALPING</code></td>
+              <td>Globalping token: 500 tests an hour instead of 250 (free)</td>
+            </tr>
+            <tr>
+              <td><code>ripe_atlas</code></td>
+              <td><code>WEPWAWET_RIPE_ATLAS</code></td>
+              <td>RIPE Atlas API key (with <code>max_credits</code>)</td>
             </tr>
           </tbody>
         </table>
@@ -231,7 +316,7 @@ censys = "…"</code></pre>
       </div>
     </main>
     <footer class="site">
-      Wepwawet 0.2.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 0.3.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

@@ -7,6 +7,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-15
+
+Measurements: Wepwawet now pings the address and works out where it can be.
+
+### Added
+
+- Measurement sources: Globalping (free; a token doubles the hourly limit), RIPE Atlas (one-off pings,
+  only with `providers.ripe_atlas.max_credits`, cost logged before spending), this machine and your
+  own servers over SSH.
+- Two-stage ping campaign: a global sweep over every continent, then a regional zoom in the country
+  of the fastest probe and of the passive answers. Phases shrink or are skipped to stay within
+  `measurements.max_tests` and what Globalping has left this hour.
+- TCP fallback: when no probe gets an ICMP reply, the sweep measures the TCP handshake to port 443.
+- Multilateration on an H3 grid: feasible region, centre, uncertainty radius and area; the GeoNames
+  cities inside it; a provisional estimate with a confidence from the region size.
+- Optional CBG calibration: the zoom probes ping RIPE Atlas anchors and get a delay-to-distance
+  line each (`measurements.calibrate`).
+- Anycast detection from speed-of-light violations, with a caveat and the nearest site.
+- Interface: probes coloured by minimum RTT, RTT disks, feasible region, estimate with uncertainty
+  and confidence, cities in the region, layer toggles, Probes tab and a budget meter.
+- `wepwawet locate --passive`, `GET /api/budget`, GeoNames in `wepwawet data update`.
+
+### Fixed
+
+- `wepwawet locate --json` always writes UTF-8, whatever the terminal encoding.
+
 ## [0.2.0] - 2026-11-15
 
 Passive evidence: Wepwawet now looks addresses up.
@@ -62,7 +88,8 @@ First release: the application, without geolocation yet.
   supported distribution.
 - Documentation site in `docs/`.
 
-[Unreleased]: https://github.com/n36l3c7/Wepwawet/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/n36l3c7/Wepwawet/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/n36l3c7/Wepwawet/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/n36l3c7/Wepwawet/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/n36l3c7/Wepwawet/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/n36l3c7/Wepwawet/releases/tag/v0.1.0

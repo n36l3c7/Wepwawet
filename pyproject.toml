@@ -1,6 +1,6 @@
 [project]
 name = "wepwawet"
-version = "0.2.0"
+version = "0.3.0"
 description = "Measurement-based IP geolocation: passive evidence plus ping and traceroute from many vantage points, on a map."
 readme = "README.md"
 license = "MIT"
@@ -27,6 +27,7 @@ dependencies = [
   "rich>=13.9",
   "maxminddb>=3.0",
   "dnspython>=2.7",
+  "h3>=4.1",
 ]
 
 [project.optional-dependencies]
@@ -87,7 +88,7 @@ packages = ["wepwawet"]
 mypy_path = "src"
 
 [[tool.mypy.overrides]]
-module = ["webview", "webview.*"]
+module = ["webview", "webview.*", "h3", "h3.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

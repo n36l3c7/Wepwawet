@@ -145,6 +145,56 @@ class Estimate(_Model):
     anycast: bool = False
 
 
+class ProbeResult(_Model):
+    """One vantage point's ping towards the target, reduced to what the geometry needs."""
+
+    probe: Probe
+    phase: str  # "sweep", "zoom", "local", "ssh"
+    min_rtt: float | None = None
+    avg_rtt: float | None = None
+    loss: float | None = Field(default=None, ge=0, le=1)
+    packets: int = 0
+    max_distance_km: float | None = None
+    calibrated: bool = False
+
+
+class CandidateCity(_Model):
+    name: str
+    country: str
+    point: GeoPoint
+    population: int = 0
+    distance_km: float = 0
+    score: float = 0
+
+
+class Region(_Model):
+    """The feasible region: where every RTT constraint allows the target to be."""
+
+    resolution: int
+    cells: int
+    area_km2: float
+    centroid: GeoPoint
+    radius_km: float
+    geometry: dict[str, Any]  # GeoJSON MultiPolygon
+    binding_probes: tuple[str, ...] = ()
+    candidates: tuple[CandidateCity, ...] = ()
+
+
+class AnycastSite(_Model):
+    point: GeoPoint
+    max_distance_km: float
+    probe: str
+
+
+class AnycastInfo(_Model):
+    """Speed-of-light violations: no single place is close enough to every fast probe."""
+
+    detected: bool
+    violations: int
+    summary: str
+    sites: tuple[AnycastSite, ...] = ()
+
+
 class RunStatus(StrEnum):
     RUNNING = "running"
     DONE = "done"
@@ -163,6 +213,9 @@ class TargetReport(BaseModel):
     caveats: list[str] = Field(default_factory=list)
     evidence: list[Evidence] = Field(default_factory=list)
     providers: list[ProviderStatus] = Field(default_factory=list)
+    probes: list[ProbeResult] = Field(default_factory=list)
+    region: Region | None = None
+    anycast: AnycastInfo | None = None
     estimate: Estimate | None = None
 
 

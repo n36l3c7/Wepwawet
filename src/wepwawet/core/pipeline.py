@@ -1,7 +1,7 @@
 """The pipeline: resolve the input, then run every phase for every target, emitting progress events.
 
-Phases so far: passive enrichment (stage 1, then stage 2 providers). Later versions add
-measurements, multilateration, traceroutes and fusion after it.
+Phases: passive enrichment (providers by stage), then the ping campaign with multilateration.
+Later versions add traceroutes and fusion after it.
 """
 
 import asyncio
@@ -11,6 +11,7 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
+from wepwawet.core.campaign import Campaign
 from wepwawet.core.http import ProviderError
 from wepwawet.core.models import NetworkInfo, ProviderStatus, RunReport, RunStatus, TargetReport
 from wepwawet.core.targets import TargetError, resolve_input
@@ -19,6 +20,10 @@ from wepwawet.providers.base import EnrichmentProvider, EnrichmentResult, Provid
 log = logging.getLogger(__name__)
 
 Emit = Callable[[str, dict[str, Any]], None]
+ANYCAST_CAVEAT = (
+    "Anycast: the address answers from several places at once. The region shown is the site nearest to "
+    "the fastest probe, not a single location."
+)
 
 
 def merge_network(current: NetworkInfo | None, new: NetworkInfo | None) -> NetworkInfo | None:
@@ -32,10 +37,17 @@ def merge_network(current: NetworkInfo | None, new: NetworkInfo | None) -> Netwo
 
 
 class Pipeline:
-    def __init__(self, ctx: ProviderContext, providers: Sequence[EnrichmentProvider], emit: Emit) -> None:
+    def __init__(
+        self,
+        ctx: ProviderContext,
+        providers: Sequence[EnrichmentProvider],
+        emit: Emit,
+        campaign: Campaign | None = None,
+    ) -> None:
         self._ctx = ctx
         self._providers = list(providers)
         self._emit = emit
+        self._campaign = campaign
 
     def _log(self, run: RunReport, level: str, source: str, message: str) -> None:
         self._emit("log", {"run": run.id, "level": level, "source": source, "message": message})
@@ -65,6 +77,8 @@ class Pipeline:
         try:
             for index, report in enumerate(run.targets):
                 await self._enrich(run, index, report)
+                if self._campaign is not None:
+                    await self._measure(run, index, report, self._campaign)
         except asyncio.CancelledError:
             run.status = RunStatus.CANCELLED
             run.finished_at = datetime.now(UTC)
@@ -95,6 +109,15 @@ class Pipeline:
                         report.caveats.append(caveat)
                 self._log(run, "info", provider.name, status.message or "ok")
             self._emit("target", {"run": run.id, "index": index, "report": report.model_dump(mode="json")})
+
+    async def _measure(self, run: RunReport, index: int, report: TargetReport, campaign: Campaign) -> None:
+        def progress() -> None:
+            self._emit("target", {"run": run.id, "index": index, "report": report.model_dump(mode="json")})
+
+        await campaign.run(report, progress)
+        if report.anycast and report.anycast.detected and ANYCAST_CAVEAT not in report.caveats:
+            report.caveats.append(ANYCAST_CAVEAT)
+        progress()
 
     async def _call(
         self, run: RunReport, report: TargetReport, provider: EnrichmentProvider

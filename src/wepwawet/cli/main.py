@@ -5,6 +5,7 @@ work in the terminal.
 """
 
 import asyncio
+import sys
 from typing import Annotated
 
 import typer
@@ -126,10 +127,12 @@ def version() -> None:
 def locate(
     target: Annotated[str, typer.Argument(help="IP address or hostname.")],
     as_json: Annotated[bool, typer.Option("--json", help="Print the full report as JSON.")] = False,
+    measure: Annotated[bool, typer.Option("--measure/--passive", help="Run the ping campaign (default).")] = True,
 ) -> None:
     """Locate an address from the terminal and print the evidence."""
     from wepwawet.cli.report import print_run
-    from wepwawet.core.context import build_context, enabled_enrichment
+    from wepwawet.core.campaign import Campaign
+    from wepwawet.core.context import build_context, enabled_enrichment, enabled_measurement
     from wepwawet.core.models import RunReport, RunStatus
     from wepwawet.core.pipeline import Pipeline
     from wepwawet.core.secrets import SecretsError
@@ -153,13 +156,17 @@ def locate(
 
     async def go() -> RunReport:
         try:
-            return await Pipeline(ctx, enabled_enrichment(config), emit).run(RunReport(id="cli", query=target))
+            campaign = Campaign(ctx, enabled_measurement(config), show) if measure else None
+            pipeline = Pipeline(ctx, enabled_enrichment(config), emit, campaign)
+            return await pipeline.run(RunReport(id="cli", query=target))
         finally:
             await ctx.http.aclose()
 
     report = asyncio.run(go())
     if as_json:
-        console.print_json(report.model_dump_json())
+        # Raw UTF-8 bytes: the JSON stays valid whatever the terminal encoding, for scripts and pipes.
+        sys.stdout.buffer.write(report.model_dump_json(indent=2).encode("utf-8") + b"\n")
+        sys.stdout.flush()
     else:
         print_run(console, report)
     if report.status is RunStatus.FAILED:
@@ -169,7 +176,9 @@ def locate(
 @app.command()
 def providers() -> None:
     """List the data sources and whether each can run now."""
-    from wepwawet.core.context import build_context, enabled_enrichment
+    from wepwawet.core.context import build_context, enabled_enrichment, enabled_measurement
+    from wepwawet.providers.base import EnrichmentProvider
+    from wepwawet.providers.measurement.base import MeasurementProvider
 
     config = _load()
     ctx = build_context(config, default_paths())
@@ -177,7 +186,11 @@ def providers() -> None:
     table.add_column("Source")
     table.add_column("Status")
     table.add_column("Note", overflow="fold")
-    for provider in enabled_enrichment(config):
+    providers_list: list[EnrichmentProvider | MeasurementProvider] = [
+        *enabled_enrichment(config),
+        *enabled_measurement(config),
+    ]
+    for provider in providers_list:
         reason = provider.unavailable_reason(ctx)
         table.add_row(provider.label, "[yellow]unavailable[/]" if reason else "[green]ready[/]", reason or "")
     console.print(table)
@@ -190,7 +203,7 @@ app.add_typer(data_app, name="data")
 @data_app.command("update")
 def data_update(
     only: Annotated[
-        list[str] | None, typer.Option("--only", help="dbip, ipinfo or geolite (repeatable). Default: all.")
+        list[str] | None, typer.Option("--only", help="dbip, ipinfo, geolite or geonames (repeatable). Default: all.")
     ] = None,
 ) -> None:
     """Download the free GeoIP databases (DB-IP Lite always; IPinfo and GeoLite2 when keys are set)."""

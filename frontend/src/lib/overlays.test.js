@@ -69,3 +69,61 @@ test('evidence groups keep first-seen order', () => {
     ],
   )
 })
+
+import { diskFeatures, probeFeatures, regionFeatures, reportBounds, rttBand } from './overlays.js'
+
+const measured = {
+  evidence: [],
+  probes: [
+    {
+      probe: { city: 'Milan', country: 'IT', location: { lat: 45.47, lon: 9.18 } },
+      min_rtt: 1.2,
+      max_distance_km: 120,
+    },
+    {
+      probe: { city: 'Paris', country: 'FR', location: { lat: 48.86, lon: 2.35 } },
+      min_rtt: 12,
+      max_distance_km: 1200,
+    },
+    { probe: { city: 'Lost', country: 'BR', location: { lat: -23, lon: -46 } }, min_rtt: null, max_distance_km: null },
+  ],
+  region: {
+    geometry: {
+      type: 'MultiPolygon',
+      coordinates: [
+        [
+          [
+            [9, 45],
+            [9.5, 45],
+            [9.5, 45.5],
+            [9, 45],
+          ],
+        ],
+      ],
+    },
+  },
+  estimate: { location: { lat: 45.4, lon: 9.2 }, uncertainty_km: 40 },
+}
+
+test('rtt bands', () => {
+  assert.deepEqual([1, 5, 14.9, 49, 149, 300, null].map(rttBand), [1, 2, 2, 3, 4, 5, 0])
+})
+
+test('probes, disks and region become GeoJSON', () => {
+  const probes = probeFeatures(measured).features
+  assert.equal(probes.length, 3)
+  assert.equal(probes[2].properties.title, 'Lost, BR · no reply')
+  const disks = diskFeatures(measured).features
+  assert.equal(disks.length, 2)
+  assert.equal(disks[0].properties.band, 1)
+  assert.deepEqual(
+    regionFeatures(measured).features.map((f) => f.properties.kind),
+    ['region', 'uncertainty'],
+  )
+})
+
+test('bounds follow the estimate when there is one', () => {
+  const [[west, south], [east, north]] = reportBounds(measured, [])
+  assert.ok(west < 9.2 && east > 9.2 && south < 45.4 && north > 45.4)
+  assert.ok(east - west < 2)
+})

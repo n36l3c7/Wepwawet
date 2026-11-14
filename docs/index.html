@@ -46,9 +46,9 @@
         on a map. Named after the Egyptian god Wepwawet, the jackal "opener of the ways".
       </p>
       <div class="note">
-        <strong>v0.2.0: passive evidence.</strong> Wepwawet reads every passive source about an address (GeoIP
-        databases, RIPE IPmap, RIPEstat, RDAP, reverse DNS, PeeringDB, Shodan, Censys) and classifies the network. Ping
-        and traceroute measurements arrive in v0.3.0.
+        <strong>v0.3.0: measurements.</strong> After the passive sources, Wepwawet pings the address from about 80
+        probes around the world, intersects the speed-of-light limits into a feasible region, names the cities inside it
+        and detects anycast. Traceroutes arrive in v0.4.0.
       </div>
       <img
         src="img/main-window.png"
@@ -118,7 +118,7 @@
             </tr>
             <tr>
               <td>0.3.0</td>
-              <td>Measurement providers, two-stage ping campaign, multilateration, anycast detection</td>
+              <td>Measurement providers, two-stage ping campaign, multilateration, anycast detection (done)</td>
             </tr>
             <tr>
               <td>0.4.0</td>
@@ -137,7 +137,7 @@
       </div>
     </main>
     <footer class="site">
-      Wepwawet 0.2.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 0.3.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

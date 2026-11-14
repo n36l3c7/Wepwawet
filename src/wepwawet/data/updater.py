@@ -3,6 +3,7 @@
 - DB-IP Lite City: monthly, no key, CC BY 4.0 (attribution: "IP geolocation by DB-IP").
 - IPinfo Lite: country and ASN, needs a free token, CC BY-SA 4.0.
 - MaxMind GeoLite2 City and ASN: need a free account ID and licence key (GeoLite EULA).
+- GeoNames cities15000: the cities used to name candidate places, CC BY 4.0.
 
 Files are written atomically: a failed download never replaces a working database.
 """
@@ -21,6 +22,7 @@ import httpx
 
 from wepwawet.core.http import USER_AGENT
 from wepwawet.core.secrets import Secrets
+from wepwawet.data.gazetteer import download_geonames
 
 DBIP_URL = "https://download.db-ip.com/free/dbip-city-lite-{month}.mmdb.gz"
 IPINFO_URL = "https://ipinfo.io/data/ipinfo_lite.mmdb"
@@ -71,7 +73,12 @@ class GeoipUpdater:
         )
 
     def update_all(self, only: set[str] | None = None, progress: Progress = lambda _m: None) -> list[UpdateResult]:
-        steps = {"dbip": self.update_dbip, "ipinfo": self.update_ipinfo, "geolite": self.update_geolite}
+        steps = {
+            "dbip": self.update_dbip,
+            "ipinfo": self.update_ipinfo,
+            "geolite": self.update_geolite,
+            "geonames": self.update_geonames,
+        }
         results = []
         for name, step in steps.items():
             if only and name not in only:
@@ -82,6 +89,10 @@ class GeoipUpdater:
             except (httpx.HTTPError, ValueError, tarfile.TarError, OSError, EOFError) as exc:
                 results.append(UpdateResult(name, "failed", str(exc)[:300]))
         return results
+
+    def update_geonames(self) -> UpdateResult:
+        count = download_geonames(self.directory.parent / "gazetteer", self._client)
+        return UpdateResult("geonames", "updated", f"GeoNames cities15000: {count:,} cities")
 
     def update_dbip(self, today: date | None = None) -> UpdateResult:
         for month in _months_back(today or datetime.now(UTC).date(), 2):

@@ -1,15 +1,32 @@
 import { useEffect, useRef, useState } from 'react'
-import { Map as MapLibreMap, Marker, NavigationControl, setWorkerUrl } from 'maplibre-gl'
+import { Map as MapLibreMap, Marker, NavigationControl, Popup, setWorkerUrl } from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { BASEMAPS, offlineStyle, readPalette, themeCartoStyle } from '../../lib/basemaps.js'
-import { POINT_KINDS, accuracyCircles, frameBounds } from '../../lib/overlays.js'
+import {
+  POINT_KINDS,
+  accuracyCircles,
+  diskFeatures,
+  probeFeatures,
+  regionFeatures,
+  reportBounds,
+} from '../../lib/overlays.js'
 import AsciiJackal from '../ui/AsciiJackal.jsx'
 
 // The bundled build cannot find MapLibre's worker next to itself; point it to Vite's copy.
 setWorkerUrl(maplibreWorkerUrl)
 
 const INITIAL_VIEW = { center: [12, 30], zoom: 1.6 }
-const CIRCLES_SOURCE = 'wpw-accuracy'
+
+/** Toggleable layers, in drawing order (bottom first). */
+export const LAYERS = [
+  { id: 'region', label: 'Feasible region' },
+  { id: 'disks', label: 'RTT disks', initiallyOff: true },
+  { id: 'accuracy', label: 'GeoIP accuracy' },
+  { id: 'probes', label: 'Probes' },
+  { id: 'estimate', label: 'Estimate' },
+  { id: 'passive', label: 'Passive answers' },
+  { id: 'facilities', label: 'PeeringDB facilities' },
+]
 
 // Natural Earth 1:50m (~750 kB): a separate chunk, loaded only for the offline map.
 const loadCountries = () => import('world-atlas/countries-50m.json').then((module) => module.default)
@@ -30,28 +47,96 @@ async function loadStyle(basemap, cartoStyleUrl, palette, signal) {
   return offlineStyle(await loadCountries(), palette)
 }
 
-/** Accuracy circles live in the style, so they are added again after every style change. */
-function drawCircles(map, circles) {
+const RTT_COLOR = (palette) => [
+  'match',
+  ['get', 'band'],
+  1,
+  palette.rtt1,
+  2,
+  palette.rtt2,
+  3,
+  palette.rtt3,
+  4,
+  palette.rtt4,
+  5,
+  palette.rtt5,
+  palette.fgSubtle,
+]
+
+/** GeoJSON layers by toggle id: sources and MapLibre layer definitions. */
+function layerSpecs(palette) {
+  return {
+    region: [
+      {
+        id: 'wpw-region-fill',
+        type: 'fill',
+        filter: ['==', ['get', 'kind'], 'region'],
+        paint: { 'fill-color': palette.accent, 'fill-opacity': 0.22 },
+      },
+      {
+        id: 'wpw-region-line',
+        type: 'line',
+        filter: ['==', ['get', 'kind'], 'region'],
+        paint: { 'line-color': palette.accent, 'line-width': 1.2, 'line-opacity': 0.8 },
+      },
+    ],
+    disks: [
+      {
+        id: 'wpw-disks',
+        type: 'line',
+        paint: { 'line-color': RTT_COLOR(palette), 'line-width': 1, 'line-opacity': 0.6, 'line-dasharray': [4, 3] },
+      },
+    ],
+    accuracy: [
+      { id: 'wpw-accuracy-fill', type: 'fill', paint: { 'fill-color': palette.accent2, 'fill-opacity': 0.06 } },
+      {
+        id: 'wpw-accuracy-line',
+        type: 'line',
+        paint: { 'line-color': palette.accent2, 'line-opacity': 0.55, 'line-width': 1, 'line-dasharray': [3, 2] },
+      },
+    ],
+    probes: [
+      {
+        id: 'wpw-probes',
+        type: 'circle',
+        paint: {
+          'circle-radius': ['case', ['==', ['get', 'band'], 0], 3, 4.5],
+          'circle-color': RTT_COLOR(palette),
+          'circle-stroke-color': palette.sunken,
+          'circle-stroke-width': 1,
+          'circle-opacity': ['case', ['==', ['get', 'band'], 0], 0.5, 1],
+        },
+      },
+    ],
+    estimate: [
+      {
+        id: 'wpw-uncertainty',
+        type: 'line',
+        filter: ['==', ['get', 'kind'], 'uncertainty'],
+        paint: { 'line-color': palette.accentFg, 'line-width': 1.6 },
+      },
+    ],
+  }
+}
+
+const SOURCE_OF = { region: 'region', estimate: 'region', disks: 'disks', accuracy: 'accuracy', probes: 'probes' }
+
+/** Add (after a style change) or update every overlay source and layer, honouring visibility. */
+function drawOverlays(map, data, visible) {
   if (!map.isStyleLoaded()) return
   const palette = readPalette()
-  const source = map.getSource(CIRCLES_SOURCE)
-  if (source) {
-    source.setData(circles)
-    return
+  for (const [name, geojson] of Object.entries(data)) {
+    const id = `wpw-src-${name}`
+    const source = map.getSource(id)
+    if (source) source.setData(geojson)
+    else map.addSource(id, { type: 'geojson', data: geojson })
   }
-  map.addSource(CIRCLES_SOURCE, { type: 'geojson', data: circles })
-  map.addLayer({
-    id: `${CIRCLES_SOURCE}-fill`,
-    type: 'fill',
-    source: CIRCLES_SOURCE,
-    paint: { 'fill-color': palette.accent2, 'fill-opacity': 0.06 },
-  })
-  map.addLayer({
-    id: `${CIRCLES_SOURCE}-line`,
-    type: 'line',
-    source: CIRCLES_SOURCE,
-    paint: { 'line-color': palette.accent2, 'line-opacity': 0.55, 'line-width': 1, 'line-dasharray': [3, 2] },
-  })
+  for (const [toggle, layers] of Object.entries(layerSpecs(palette))) {
+    for (const layer of layers) {
+      if (!map.getLayer(layer.id)) map.addLayer({ ...layer, source: `wpw-src-${SOURCE_OF[toggle]}` })
+      map.setLayoutProperty(layer.id, 'visibility', visible[toggle] ? 'visible' : 'none')
+    }
+  }
 }
 
 /** HTML markers survive style changes and need no glyph server (the offline map has none). */
@@ -72,10 +157,26 @@ function markerElement(point) {
   return element
 }
 
-export default function MapView({ basemap, cartoStyleUrl, points, onBasemapChange, onLog }) {
+function estimateElement(estimate) {
+  const element = document.createElement('div')
+  element.className = 'wpw-estimate'
+  element.setAttribute('role', 'img')
+  const where = [estimate.city, estimate.country].filter(Boolean).join(', ') || 'Estimate'
+  element.setAttribute('aria-label', `Estimate: ${where}, ±${Math.round(estimate.uncertainty_km)} km`)
+  const label = document.createElement('span')
+  label.textContent = `${where} ±${Math.round(estimate.uncertainty_km)} km`
+  element.appendChild(label)
+  return element
+}
+
+const initialVisibility = () => Object.fromEntries(LAYERS.map((l) => [l.id, !l.initiallyOff]))
+
+export default function MapView({ basemap, cartoStyleUrl, report, points, onBasemapChange, onLog }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
-  const circlesRef = useRef(accuracyCircles([]))
+  const dataRef = useRef({})
+  const [visible, setVisible] = useState(initialVisibility)
+  const visibleRef = useRef(visible)
   const [webglError, setWebglError] = useState(null)
   const [cursor, setCursor] = useState(null)
 
@@ -97,7 +198,13 @@ export default function MapView({ basemap, cartoStyleUrl, points, onBasemapChang
     map.addControl(new NavigationControl({ showCompass: false }), 'bottom-right')
     map.on('mousemove', (event) => setCursor(event.lngLat))
     map.on('mouseout', () => setCursor(null))
-    map.on('style.load', () => drawCircles(map, circlesRef.current))
+    map.on('style.load', () => drawOverlays(map, dataRef.current, visibleRef.current))
+    const popup = new Popup({ closeButton: false, closeOnClick: false, className: 'wpw-popup' })
+    map.on('mouseenter', 'wpw-probes', (event) => {
+      map.getCanvas().style.cursor = 'default'
+      popup.setLngLat(event.lngLat).setText(event.features[0].properties.title).addTo(map)
+    })
+    map.on('mouseleave', 'wpw-probes', () => popup.remove())
     mapRef.current = map
     return () => {
       map.remove()
@@ -123,20 +230,55 @@ export default function MapView({ basemap, cartoStyleUrl, points, onBasemapChang
     return () => controller.abort()
   }, [basemap, cartoStyleUrl, onBasemapChange, onLog])
 
-  // Points and circles of the current report.
+  // GeoJSON overlays of the current report.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    dataRef.current = {
+      region: regionFeatures(report),
+      disks: diskFeatures(report),
+      accuracy: accuracyCircles(points),
+      probes: probeFeatures(report),
+    }
+    drawOverlays(map, dataRef.current, visibleRef.current)
+  }, [report, points])
+
+  // Layer visibility.
+  useEffect(() => {
+    visibleRef.current = visible
+    const map = mapRef.current
+    if (map) drawOverlays(map, dataRef.current, visible)
+  }, [visible])
+
+  // HTML markers: passive answers, facilities and the estimate.
   useEffect(() => {
     const map = mapRef.current
     if (!map) return undefined
-    circlesRef.current = accuracyCircles(points)
-    drawCircles(map, circlesRef.current)
-    const ordered = [...points].sort((a, b) => (POINT_KINDS[b.kind]?.order ?? 0) - (POINT_KINDS[a.kind]?.order ?? 0))
+    const shown = points.filter((p) => (p.kind === 'facility' ? visible.facilities : visible.passive))
+    const ordered = [...shown].sort((a, b) => (POINT_KINDS[b.kind]?.order ?? 0) - (POINT_KINDS[a.kind]?.order ?? 0))
     const markers = ordered.map((point) =>
       new Marker({ element: markerElement(point), anchor: 'center' }).setLngLat([point.lon, point.lat]).addTo(map),
     )
-    const bounds = frameBounds(points)
-    if (bounds) map.fitBounds(bounds, { padding: 80, maxZoom: 8, duration: 800 })
+    if (report?.estimate && visible.estimate) {
+      const { location } = report.estimate
+      markers.push(
+        new Marker({ element: estimateElement(report.estimate), anchor: 'center' })
+          .setLngLat([location.lon, location.lat])
+          .addTo(map),
+      )
+    }
     return () => markers.forEach((marker) => marker.remove())
-  }, [points])
+  }, [points, report, visible])
+
+  // Frame the result when the target or its estimate changes.
+  const frameKey = `${report?.target?.address ?? ''}|${report?.estimate ? 'e' : 'p'}|${points.length > 0}`
+  useEffect(() => {
+    const map = mapRef.current
+    const bounds = reportBounds(report, points)
+    if (map && bounds) map.fitBounds(bounds, { padding: 70, maxZoom: 9, duration: 800 })
+    // Only re-frame on a new target or when an estimate first appears, not on every update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [frameKey])
 
   if (webglError) {
     return (
@@ -153,6 +295,7 @@ export default function MapView({ basemap, cartoStyleUrl, points, onBasemapChang
     )
   }
 
+  const hasData = Boolean(report)
   return (
     <div className="relative h-full">
       {/* h-full, not absolute: maplibre-gl.css forces position: relative on the container. */}
@@ -177,16 +320,39 @@ export default function MapView({ basemap, cartoStyleUrl, points, onBasemapChang
           </button>
         ))}
       </div>
-      {points.length ? (
-        <div className="absolute left-2.5 top-2.5 grid gap-1 border border-line bg-sunken/90 px-2.5 py-1.5 font-mono text-[10.5px] text-fg-muted">
-          {Object.entries(POINT_KINDS).map(([kind, { label }]) => (
-            <span key={kind} className="flex items-center gap-2">
-              <span aria-hidden="true" className={`wpw-marker wpw-marker-${kind} wpw-legend`}>
-                <i className="wpw-shape" />
-              </span>
-              {label}
-            </span>
+      {hasData ? (
+        <fieldset className="absolute left-2.5 top-2.5 grid gap-0.5 border border-line bg-sunken/90 px-2.5 py-1.5 font-mono text-[11px] text-fg-muted max-[860px]:hidden">
+          <legend className="sr-only">Layers</legend>
+          <span className="text-[10px] uppercase tracking-widest text-fg-subtle">layers</span>
+          {LAYERS.map((layer) => (
+            <label key={layer.id} className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                id={`layer-${layer.id}`}
+                checked={visible[layer.id]}
+                onChange={(event) => setVisible((v) => ({ ...v, [layer.id]: event.target.checked }))}
+                className="m-0 accent-[var(--color-accent)]"
+              />
+              {layer.label}
+            </label>
           ))}
+        </fieldset>
+      ) : null}
+      {report?.probes?.length ? (
+        <div className="absolute bottom-2.5 left-[118px] grid gap-1 border border-line bg-sunken/90 px-2.5 py-1.5 font-mono text-[10px] text-fg-muted max-[860px]:hidden">
+          <span>min RTT (ms)</span>
+          <span className="flex">
+            {[1, 2, 3, 4, 5].map((band) => (
+              <i key={band} className="block h-1.5 w-7" style={{ background: `var(--color-rtt${band})` }} />
+            ))}
+          </span>
+          <span className="flex justify-between gap-2 tabular-nums">
+            <span>0</span>
+            <span>5</span>
+            <span>15</span>
+            <span>50</span>
+            <span>150+</span>
+          </span>
         </div>
       ) : null}
       <div className="pointer-events-none absolute bottom-2.5 left-2.5 border border-line bg-sunken/90 px-2 py-1 font-mono text-[10.5px] tabular-nums text-fg-muted">

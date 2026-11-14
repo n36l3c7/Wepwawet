@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { SOURCE_LABELS, groupEvidence } from '../../lib/overlays.js'
+import { SOURCE_LABELS, groupEvidence, rttBand } from '../../lib/overlays.js'
 import AsciiJackal from '../ui/AsciiJackal.jsx'
 
 const TABS = [
   { id: 'summary', label: 'Summary' },
   { id: 'evidence', label: 'Evidence' },
   { id: 'hops', label: 'Hops', from: '0.4.0', what: 'Traceroute hops with PTR, ASN and location hints' },
-  { id: 'probes', label: 'Probes', from: '0.3.0', what: 'Probes and their minimum RTT' },
+  { id: 'probes', label: 'Probes' },
   { id: 'raw', label: 'Raw' },
   { id: 'history', label: 'History', from: '0.5.0', what: 'Past runs and their differences' },
 ]
@@ -55,7 +55,8 @@ function Idle() {
         <ul className="grid list-disc gap-1 pl-4 text-fg-muted">
           <li>Reads passive sources: GeoIP databases, RIPE IPmap, RIPEstat, RDAP, reverse DNS, PeeringDB.</li>
           <li>Classifies the network (residential, mobile, hosting, CDN) to say what the answer can mean.</li>
-          <li>Measurements and multilateration arrive in v0.3.0.</li>
+          <li>Pings the target from about 50 probes worldwide, then about 30 near the fastest ones.</li>
+          <li>Intersects the speed-of-light disks into a feasible region and detects anycast.</li>
         </ul>
       </section>
       <section className="grid gap-2">
@@ -76,7 +77,9 @@ function Running({ run }) {
       <AsciiJackal mood="animated" preset="medium" />
       <div className="grid gap-1">
         <b className="font-mono text-sm font-medium">Looking up {run.query}</b>
-        <span className="text-fg-muted">Reading the passive sources. Findings appear as they arrive.</span>
+        <span className="text-fg-muted">
+          Reading the passive sources, then measuring. Findings appear as they arrive.
+        </span>
       </div>
     </div>
   )
@@ -109,6 +112,143 @@ function KeyValues({ rows }) {
   )
 }
 
+function EstimateCard({ report }) {
+  const estimate = report.estimate
+  const region = report.region
+  const where = [estimate.city, estimate.country].filter(Boolean).join(', ')
+  const probes = report.probes.filter((p) => p.min_rtt !== null).length
+  return (
+    <section className="grid gap-2.5 border border-accent/60 bg-canvas p-3">
+      <div className="font-mono text-[10.5px] uppercase tracking-widest text-fg-subtle">
+        {estimate.anycast ? 'Nearest anycast site' : 'Estimate'}
+      </div>
+      <div className="font-mono text-[22px] font-bold leading-tight text-accent-fg">
+        {where || `${estimate.location.lat.toFixed(3)}, ${estimate.location.lon.toFixed(3)}`}
+      </div>
+      <KeyValues
+        rows={[
+          ['coordinates', `${estimate.location.lat.toFixed(4)}, ${estimate.location.lon.toFixed(4)}`],
+          ['uncertainty', `±${Math.round(estimate.uncertainty_km).toLocaleString('en')} km`],
+          [
+            'region',
+            region ? `${Math.round(region.area_km2).toLocaleString('en')} km² · H3 res ${region.resolution}` : null,
+          ],
+          ['probes', `${probes} answered of ${report.probes.length}`],
+        ]}
+      />
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2" title="Confidence, 0 to 100">
+        <div
+          className="relative h-[7px] bg-line-soft"
+          role="meter"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow={estimate.confidence}
+          aria-label="Confidence"
+        >
+          <span className="absolute inset-y-0 left-0 bg-accent" style={{ width: `${estimate.confidence}%` }} />
+        </div>
+        <b className="font-mono text-[13px] text-accent-fg">{estimate.confidence}</b>
+      </div>
+      {estimate.explanation.map((line) => (
+        <p key={line} className="text-[12px] text-fg-muted">
+          {line}
+        </p>
+      ))}
+    </section>
+  )
+}
+
+function Candidates({ region }) {
+  if (!region?.candidates?.length) return null
+  return (
+    <section className="grid gap-2">
+      <Heading>Cities in the region</Heading>
+      <table className="w-full border-collapse font-mono text-[11.5px] tabular-nums">
+        <thead>
+          <tr className="text-left text-[10px] uppercase tracking-wide text-fg-subtle">
+            <th className="border-b border-line py-1 font-medium">City</th>
+            <th className="border-b border-line py-1 text-right font-medium">From centre</th>
+            <th className="border-b border-line py-1 text-right font-medium">Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {region.candidates.slice(0, 8).map((c) => (
+            <tr key={`${c.name}-${c.country}`}>
+              <td className="border-b border-line-soft py-1">
+                {c.name} <span className="text-fg-subtle">{c.country}</span>
+              </td>
+              <td className="border-b border-line-soft py-1 text-right">{Math.round(c.distance_km)} km</td>
+              <td className="border-b border-line-soft py-1 text-right">{c.score.toFixed(2)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  )
+}
+
+function Anycast({ anycast }) {
+  if (!anycast?.detected) return null
+  return (
+    <section
+      role="note"
+      className="grid gap-1.5 border border-warn bg-[color-mix(in_srgb,var(--color-warn)_12%,transparent)] p-2.5 text-[12.5px]"
+    >
+      <b className="font-mono text-[12px] text-warn">Anycast</b>
+      <span>{anycast.summary}.</span>
+    </section>
+  )
+}
+
+function Probes({ report }) {
+  if (!report?.probes?.length) {
+    return <p className="text-fg-muted">No measurements yet. They start after the passive sources.</p>
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse font-mono text-[11.5px] tabular-nums">
+        <thead>
+          <tr className="text-left text-[10px] uppercase tracking-wide text-fg-subtle">
+            <th className="border-b border-line px-1 py-1 font-medium">Probe</th>
+            <th className="border-b border-line px-1 py-1 font-medium">Phase</th>
+            <th className="border-b border-line px-1 py-1 text-right font-medium">min RTT</th>
+            <th className="border-b border-line px-1 py-1 text-right font-medium">d max</th>
+          </tr>
+        </thead>
+        <tbody>
+          {report.probes.map((p) => (
+            <tr key={`${p.probe.provider}-${p.probe.probe_id}`}>
+              <td className="border-b border-line-soft px-1 py-1">
+                <span
+                  aria-hidden="true"
+                  className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle"
+                  style={{
+                    background: p.min_rtt === null ? 'var(--color-fg-subtle)' : `var(--color-rtt${rttBand(p.min_rtt)})`,
+                  }}
+                />
+                {[p.probe.city, p.probe.country].filter(Boolean).join(', ') || p.probe.probe_id}
+                <span className="block pl-3.5 text-[10.5px] text-fg-subtle">
+                  {[p.probe.asn ? `AS${p.probe.asn}` : null, p.probe.network, p.probe.provider]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              </td>
+              <td className="border-b border-line-soft px-1 py-1 text-fg-muted">{p.phase}</td>
+              <td className="border-b border-line-soft px-1 py-1 text-right">
+                {p.min_rtt === null ? <span className="text-fg-subtle">no reply</span> : `${p.min_rtt.toFixed(1)} ms`}
+              </td>
+              <td className="border-b border-line-soft px-1 py-1 text-right">
+                {p.max_distance_km === null ? '—' : `${Math.round(p.max_distance_km).toLocaleString('en')} km`}
+                {p.calibrated ? <span className="block text-[10px] text-accent2">calibrated</span> : null}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 function Summary({ report, running }) {
   const net = report.network ?? {}
   const located = report.evidence.filter((e) => e.point && e.source !== 'peeringdb')
@@ -129,6 +269,9 @@ function Summary({ report, running }) {
           <span>{caveat}</span>
         </div>
       ))}
+      <Anycast anycast={report.anycast} />
+      {report.estimate ? <EstimateCard report={report} /> : null}
+      <Candidates region={report.region} />
       <section className="grid gap-2.5 border border-line bg-canvas p-3">
         <div>
           <div className="min-w-0">
@@ -174,7 +317,7 @@ function Summary({ report, running }) {
           </p>
         )}
         <p className="text-[12px] text-fg-subtle">
-          These are passive answers. Measurements that confirm or rule them out arrive in v0.3.0.
+          These are passive answers. The RTT region above confirms or rules them out.
         </p>
       </section>
       <section className="grid gap-2">
@@ -252,6 +395,8 @@ export default function SidePanel({ run, targetIndex, onTargetChange }) {
         {current.what} will appear here from v{current.from}.
       </p>
     )
+  } else if (tab === 'probes') {
+    body = <Probes report={report} />
   } else if (tab === 'raw') {
     body = run ? (
       <pre className="m-0 overflow-auto border border-line bg-canvas p-2.5 font-mono text-[11px] leading-normal text-fg-muted">
@@ -294,6 +439,9 @@ export default function SidePanel({ run, targetIndex, onTargetChange }) {
             {t.label}
             {t.id === 'evidence' && report ? (
               <span className="ml-1 text-fg-subtle">{report.evidence.length}</span>
+            ) : null}
+            {t.id === 'probes' && report?.probes?.length ? (
+              <span className="ml-1 text-fg-subtle">{report.probes.length}</span>
             ) : null}
           </button>
         ))}

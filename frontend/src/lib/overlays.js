@@ -103,3 +103,78 @@ export const SOURCE_LABELS = {
   peeringdb: 'PeeringDB',
   classify: 'Network classification',
 }
+
+/** RTT colour band (1 = near, 5 = far): thresholds in milliseconds. */
+export const RTT_BANDS = [5, 15, 50, 150]
+
+export function rttBand(rtt) {
+  if (rtt === null || rtt === undefined) return 0
+  const index = RTT_BANDS.findIndex((limit) => rtt < limit)
+  return index === -1 ? 5 : index + 1
+}
+
+/** Probes as GeoJSON points, with their RTT band for styling. */
+export function probeFeatures(report) {
+  return {
+    type: 'FeatureCollection',
+    features: (report?.probes ?? []).map((p, index) => ({
+      type: 'Feature',
+      properties: {
+        id: index,
+        band: rttBand(p.min_rtt),
+        rtt: p.min_rtt,
+        title: `${[p.probe.city, p.probe.country].filter(Boolean).join(', ')} · ${
+          p.min_rtt === null ? 'no reply' : `${p.min_rtt.toFixed(1)} ms`
+        }`,
+      },
+      geometry: { type: 'Point', coordinates: [p.probe.location.lon, p.probe.location.lat] },
+    })),
+  }
+}
+
+/** The `limit` tightest RTT disks (the ones that shape the region). */
+export function diskFeatures(report, limit = 12) {
+  const answered = (report?.probes ?? []).filter((p) => p.max_distance_km !== null && p.max_distance_km !== undefined)
+  answered.sort((a, b) => a.max_distance_km - b.max_distance_km)
+  return {
+    type: 'FeatureCollection',
+    features: answered.slice(0, limit).map((p) => ({
+      type: 'Feature',
+      properties: { band: rttBand(p.min_rtt) },
+      geometry: circlePolygon(p.probe.location.lon, p.probe.location.lat, Math.min(p.max_distance_km, 19000)),
+    })),
+  }
+}
+
+/** The feasible region polygon and the estimate's uncertainty circle. */
+export function regionFeatures(report) {
+  const features = []
+  if (report?.region)
+    features.push({ type: 'Feature', properties: { kind: 'region' }, geometry: report.region.geometry })
+  if (report?.estimate) {
+    const { location, uncertainty_km: radius } = report.estimate
+    features.push({
+      type: 'Feature',
+      properties: { kind: 'uncertainty' },
+      geometry: circlePolygon(location.lon, location.lat, Math.min(radius, 19000)),
+    })
+  }
+  return { type: 'FeatureCollection', features }
+}
+
+/** Bounds of the region (or estimate) when there is one, else of the passive points. */
+export function reportBounds(report, points) {
+  if (report?.estimate) {
+    const { location, uncertainty_km: radius } = report.estimate
+    const ring = circlePolygon(location.lon, location.lat, Math.max(radius, 20)).coordinates[0]
+    const lons = ring.map((c) => c[0])
+    const lats = ring.map((c) => c[1])
+    return [
+      [Math.max(-180, Math.min(...lons)), Math.max(-85, Math.min(...lats))],
+      [Math.min(180, Math.max(...lons)), Math.min(85, Math.max(...lats))],
+    ]
+  }
+  return frameBounds(points)
+}
+
+SOURCE_LABELS.rtt = 'RTT measurements'

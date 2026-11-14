@@ -66,6 +66,39 @@
         VPN exit.
       </p>
 
+      <h2>Measurements</h2>
+      <p>After the passive sources, Wepwawet measures the round-trip time (RTT) to the address:</p>
+      <ol>
+        <li>
+          <strong>Global sweep</strong>: about 48 Globalping probes spread over every continent. The fastest ones are
+          near the target.
+        </li>
+        <li>
+          <strong>Regional zoom</strong>: about 30 probes in the country of the fastest probe and in the countries the
+          passive answers name.
+        </li>
+        <li>
+          <strong>Feasible region</strong>: light in fibre covers about 100 km per millisecond of round trip, so each
+          probe bounds the distance. The places inside every bound form the region, drawn on the map with the estimate
+          (its centre) and the uncertainty circle.
+        </li>
+      </ol>
+      <p>
+        Probes are coloured by their minimum RTT, from pale (near) to dark (far). Turn on <strong>RTT disks</strong> in
+        the layer list to see the bounds that shape the region. The <strong>Probes</strong> tab lists every probe with
+        its RTT and distance bound.
+      </p>
+      <p>
+        If no probe gets an ICMP reply (many servers drop ping), the sweep is repeated as a TCP handshake to port 443.
+        When two fast probes are too far apart for a single place, the address is <strong>anycast</strong>: Wepwawet
+        says so and shows the site nearest to the fastest probe.
+      </p>
+      <p>
+        Globalping allows 250 tests an hour without an account (one test per probe); a campaign uses about 80. The meter
+        in the top bar shows what is left, and a campaign shrinks or skips a phase rather than exceed it. A free
+        Globalping token doubles the limit.
+      </p>
+
       <h2>Sources</h2>
       <div class="table-wrap">
         <table>
@@ -123,6 +156,21 @@
               <td>Location, DNS names and certificate subjects</td>
             </tr>
             <tr>
+              <td>Globalping</td>
+              <td>optional (free token)</td>
+              <td>Pings from thousands of community probes</td>
+            </tr>
+            <tr>
+              <td>RIPE Atlas</td>
+              <td>yes, and a credit budget</td>
+              <td>One-off pings from RIPE Atlas probes (6 credits per probe)</td>
+            </tr>
+            <tr>
+              <td>This machine, SSH probes</td>
+              <td>no (location in the configuration)</td>
+              <td>Pings from your own computer and servers</td>
+            </tr>
+            <tr>
               <td>Network classification</td>
               <td>no</td>
               <td>
@@ -140,7 +188,8 @@
 
       <h2>From the terminal</h2>
       <pre><code>wepwawet locate ripe.net            # report in the terminal
-wepwawet locate 193.0.6.139 --json  # the full report as JSON</code></pre>
+wepwawet locate 193.0.6.139 --json  # the full report as JSON
+wepwawet locate ripe.net --passive  # passive sources only, no measurements</code></pre>
 
       <h2>When the window cannot open</h2>
       <p>
@@ -158,7 +207,7 @@ wepwawet serve            # server only; open the printed address yourself</code
       </p>
     </main>
     <footer class="site">
-      Wepwawet 0.2.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 0.3.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

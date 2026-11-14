@@ -178,3 +178,42 @@ body {
 .scrollbar-none {
   scrollbar-width: none;
 }
+
+/* Estimate: a crosshair with its label */
+.wpw-estimate {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  background:
+    linear-gradient(var(--color-accent-fg), var(--color-accent-fg)) center / 2px 100% no-repeat,
+    linear-gradient(var(--color-accent-fg), var(--color-accent-fg)) center / 100% 2px no-repeat;
+  filter: drop-shadow(0 0 2px var(--color-sunken));
+}
+.wpw-estimate > span {
+  position: absolute;
+  left: 26px;
+  top: 2px;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-accent-fg);
+  text-shadow:
+    0 0 3px var(--color-sunken),
+    0 0 3px var(--color-sunken);
+}
+
+/* Probe hover */
+.wpw-popup .maplibregl-popup-content {
+  background: var(--color-sunken);
+  color: var(--color-fg);
+  border: 1px solid var(--color-line);
+  border-radius: 0;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  box-shadow: none;
+}
+.wpw-popup .maplibregl-popup-tip {
+  display: none;
+}

@@ -62,5 +62,6 @@ async function sendJson(method, path, body) {
 }
 
 export const fetchProviders = (options) => getJson('/api/providers', options)
+export const fetchBudget = (options) => getJson('/api/budget', options)
 export const startRun = (query) => sendJson('POST', '/api/runs', { query })
 export const cancelRun = (id) => sendJson('DELETE', `/api/runs/${encodeURIComponent(id)}`)

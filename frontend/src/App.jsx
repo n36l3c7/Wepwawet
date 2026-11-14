@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { cancelRun, fetchMeta, fetchProviders, startRun, subscribeEvents } from './lib/api.js'
+import { cancelRun, fetchBudget, fetchMeta, fetchProviders, startRun, subscribeEvents } from './lib/api.js'
 import { reportPoints } from './lib/overlays.js'
 import TopBar from './components/layout/TopBar.jsx'
 import LogPane from './components/layout/LogPane.jsx'
@@ -18,6 +18,13 @@ export default function App() {
   const [run, setRun] = useState(null)
   const [targetIndex, setTargetIndex] = useState(0)
   const [inputError, setInputError] = useState(null)
+  const [budgets, setBudgets] = useState([])
+
+  const refreshBudget = useCallback(() => {
+    fetchBudget()
+      .then(setBudgets)
+      .catch(() => setBudgets([]))
+  }, [])
 
   const log = useCallback((level, source, message) => {
     setEntries((list) => [...list.slice(-499), { id: nextLogId++, time: now(), level, source, message }])
@@ -50,6 +57,7 @@ export default function App() {
           run: (data) => {
             setRun((current) => (current && current.id !== data.id ? current : data))
             if (data.status === 'failed') setInputError(data.error)
+            if (data.status !== 'running') refreshBudget()
           },
           target: (data) =>
             setRun((current) => {
@@ -61,8 +69,10 @@ export default function App() {
         },
         setConnection,
       ),
-    [log],
+    [log, refreshBudget],
   )
+
+  useEffect(() => refreshBudget(), [refreshBudget])
 
   const onRun = useCallback(
     async (query) => {
@@ -98,6 +108,7 @@ export default function App() {
         version={meta?.version}
         running={run?.status === 'running'}
         providers={providers}
+        budgets={budgets}
         error={inputError}
         onRun={onRun}
         onStop={onStop}
@@ -107,6 +118,7 @@ export default function App() {
           <MapView
             basemap={basemap}
             cartoStyleUrl={meta?.basemaps?.carto?.style}
+            report={report}
             points={points}
             onBasemapChange={setBasemap}
             onLog={log}

@@ -152,6 +152,10 @@ def create_app(
     def providers() -> list[dict[str, Any]]:
         return svc.provider_status()
 
+    @app.get("/api/budget")
+    async def budget() -> list[dict[str, Any]]:
+        return await svc.budgets()
+
     @app.post("/api/runs", status_code=202)
     async def start_run(body: RunRequest) -> dict[str, Any]:
         try:

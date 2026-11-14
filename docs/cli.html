@@ -65,7 +65,11 @@
           <tbody>
             <tr>
               <td><code>--json</code></td>
-              <td>Print the full report as JSON (for scripts).</td>
+              <td>Print the full report as JSON (UTF-8, for scripts).</td>
+            </tr>
+            <tr>
+              <td><code>--passive</code></td>
+              <td>Passive sources only: no ping campaign.</td>
             </tr>
           </tbody>
         </table>
@@ -76,9 +80,9 @@
 
       <h2><code>wepwawet data update</code> / <code>wepwawet data status</code></h2>
       <p>
-        Download the free GeoIP databases, or list the installed ones.
-        <code>--only dbip|ipinfo|geolite</code> (repeatable) limits the update. A failed download never replaces a
-        working database.
+        Download the free GeoIP databases and the GeoNames city list, or list the installed ones.
+        <code>--only dbip|ipinfo|geolite|geonames</code> (repeatable) limits the update. A failed download never
+        replaces a working database.
       </p>
 
       <h2><code>wepwawet serve</code></h2>
@@ -166,6 +170,10 @@
               <td>Sources, each with the reason it cannot run (or <code>null</code>)</td>
             </tr>
             <tr>
+              <td><code>GET /api/budget</code></td>
+              <td>What each measurement source has left (tests this hour, credits)</td>
+            </tr>
+            <tr>
               <td><code>POST /api/runs</code></td>
               <td>Body <code>{"query": "…"}</code>; starts a run (202), 409 while another runs</td>
             </tr>
@@ -186,7 +194,7 @@
       </div>
     </main>
     <footer class="site">
-      Wepwawet 0.2.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 0.3.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>
