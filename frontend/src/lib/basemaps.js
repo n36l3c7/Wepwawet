@@ -28,6 +28,7 @@ export function readPalette(element = document.documentElement) {
     fgMuted: v('fg-muted'),
     fgSubtle: v('fg-subtle'),
     accent: v('accent'),
+    accent2: v('accent2'),
   }
 }
 

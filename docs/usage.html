@@ -22,44 +22,125 @@
     </header>
     <main>
       <h1>Usage</h1>
-      <p class="lede">Open Wepwawet from the desktop menu, or type <code>wepwawet</code> in a terminal.</p>
+      <p class="lede">
+        Open Wepwawet from the desktop menu or type <code>wepwawet</code>, enter an address and press Run.
+      </p>
 
-      <h2>The window</h2>
-      <img
-        src="img/main-window.png"
-        alt="The Wepwawet window with its map, side panel and log."
-        width="1416"
-        height="808"
-      />
+      <h2>Locate an address</h2>
+      <img src="img/main-window.png" alt="Wepwawet locating 193.0.6.139." width="1416" height="808" />
+      <ol>
+        <li>
+          Type an IPv4 or IPv6 address, or a hostname, in the top bar and press <strong>Run</strong>. A hostname is
+          resolved to all its A and AAAA records; each public address gets its own report (switch between them above the
+          panel).
+        </li>
+        <li>Findings arrive live: the log at the bottom shows each source as it answers.</li>
+        <li>
+          Private, documentation, CGNAT and other special-purpose addresses are refused with the reason, since they
+          cannot be located on the Internet.
+        </li>
+        <li><strong>Stop</strong> cancels the run.</li>
+      </ol>
+
+      <h2>Reading the result</h2>
       <ul>
         <li>
-          <strong>Top bar</strong>: the target (an IP address or a hostname) and the Run button. Locating targets
-          arrives in v0.2.0.
+          <strong>Summary</strong>: the routed prefix and origin AS, the registration (RIR, country, holder), the
+          network class and where each source puts the address.
         </li>
         <li>
-          <strong>Map</strong>: drag to move, scroll or use + and − to zoom. The coordinates under the pointer are in
-          the bottom-left corner.
+          <strong>Evidence</strong>: every finding grouped by source, tagged <em>soft</em> (a hint about the location),
+          <em>info</em> (context) or, from v0.3.0, <em>hard</em> (a physical limit from a measurement). Open
+          <em>details</em> for the facts behind each line.
         </li>
+        <li><strong>Raw</strong>: the complete report as JSON.</li>
         <li>
-          <strong>Side panel</strong>: Summary, Evidence, Hops, Probes, Raw and History tabs. In v0.1.0 only Summary has
-          content.
+          <strong>Map</strong>: diamonds are GeoIP database answers, with their accuracy circle; round markers are
+          locations from services such as RIPE IPmap, Shodan and Censys; small squares are PeeringDB facilities of the
+          origin network.
         </li>
-        <li><strong>Log</strong>: live messages from the local server. "live · sse" means the window is connected.</li>
       </ul>
+      <p>
+        An information banner explains what the answer can mean for the kind of network: for a residential line the
+        realistic ceiling is the provider's point of presence; for hosting you are locating the server, which may be a
+        VPN exit.
+      </p>
 
-      <h2>Base maps</h2>
-      <p>The buttons in the top-right corner of the map switch between:</p>
-      <ul>
-        <li>
-          <strong>CARTO dark</strong> (default): street-level vector tiles from CARTO, built from OpenStreetMap data and
-          recoloured to match the interface. Needs the network and follows CARTO's terms.
-        </li>
-        <li>
-          <strong>Vector · offline</strong>: country outlines from Natural Earth, bundled with the application. No
-          network request at all.
-        </li>
-      </ul>
-      <p>If CARTO cannot be reached, Wepwawet switches to the offline map and says so in the log.</p>
+      <h2>Sources</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Source</th>
+              <th>Key</th>
+              <th>What it adds</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>GeoIP databases</td>
+              <td>no (download once)</td>
+              <td>DB-IP Lite, IPinfo Lite, GeoLite2 answers and how far apart they are</td>
+            </tr>
+            <tr>
+              <td>RIPE IPmap</td>
+              <td>no</td>
+              <td>RIPE NCC's own geolocation, from crowdsourced and latency data</td>
+            </tr>
+            <tr>
+              <td>RIPEstat</td>
+              <td>no</td>
+              <td>Routed prefix, origin AS, RIR country, GeoLite2 answer</td>
+            </tr>
+            <tr>
+              <td>RDAP</td>
+              <td>no</td>
+              <td>Registration: block, name, holder, country, customer assignments</td>
+            </tr>
+            <tr>
+              <td>Reverse DNS</td>
+              <td>no</td>
+              <td>PTR of the target and naming patterns of its /24 neighbours (DNS queries only)</td>
+            </tr>
+            <tr>
+              <td>PeeringDB</td>
+              <td>optional</td>
+              <td>Facilities and exchanges where the origin network is present</td>
+            </tr>
+            <tr>
+              <td>Shodan InternetDB</td>
+              <td>no</td>
+              <td>Open ports, names and tags such as <code>vpn</code> or <code>cloud</code> (non-commercial use)</td>
+            </tr>
+            <tr>
+              <td>Shodan</td>
+              <td>yes (paid membership)</td>
+              <td>Shodan's full host record, with its location</td>
+            </tr>
+            <tr>
+              <td>Censys</td>
+              <td>yes (free plan: 100 lookups a month)</td>
+              <td>Location, DNS names and certificate subjects</td>
+            </tr>
+            <tr>
+              <td>Network classification</td>
+              <td>no</td>
+              <td>
+                Residential, mobile, hosting, CDN, VPN or education, from cloud ranges, PeeringDB, AS name and PTR
+                patterns
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Every answer is cached (one day by default), so running the same address again costs no requests. The top bar
+        shows which sources are ready; hover a source for the reason it is not.
+      </p>
+
+      <h2>From the terminal</h2>
+      <pre><code>wepwawet locate ripe.net            # report in the terminal
+wepwawet locate 193.0.6.139 --json  # the full report as JSON</code></pre>
 
       <h2>When the window cannot open</h2>
       <p>
@@ -68,18 +149,16 @@
       </p>
       <pre><code>wepwawet gui --browser    # same interface, in the system browser
 wepwawet serve            # server only; open the printed address yourself</code></pre>
-      <p>If the map shows "The map cannot start", the display has no working WebGL: use <code>--browser</code>.</p>
 
       <h2>The jackal</h2>
       <p>
         The ASCII jackal shows what Wepwawet is doing: asleep when there is nothing to do, sniffing and looking around
-        while it measures, with a crossed eye on errors, and pleased when it has an answer. With "reduce motion" enabled
-        in your desktop settings it stays still.
+        while it works, with a crossed eye on errors. With "reduce motion" enabled in your desktop settings it stays
+        still.
       </p>
     </main>
     <footer class="site">
-      Wepwawet 0.1.1 · MIT licence ·
-      <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 0.2.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

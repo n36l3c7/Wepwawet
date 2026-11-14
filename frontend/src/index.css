@@ -115,3 +115,66 @@ body {
     transition: none !important;
   }
 }
+
+/* Map markers (HTML, so they survive base map changes): a shape plus an optional label */
+.wpw-marker {
+  display: block;
+  position: relative;
+  width: 14px;
+  height: 14px;
+  cursor: default;
+}
+.wpw-shape {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  display: block;
+  box-sizing: border-box;
+}
+.wpw-marker-geoip .wpw-shape {
+  width: 10px;
+  height: 10px;
+  transform: rotate(45deg);
+  background: var(--color-canvas);
+  border: 2px solid var(--color-accent2);
+}
+.wpw-marker-located .wpw-shape {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: 2px solid var(--color-canvas);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+.wpw-marker-facility .wpw-shape {
+  width: 7px;
+  height: 7px;
+  background: var(--color-fg-muted);
+  border: 1px solid var(--color-canvas);
+}
+.wpw-marker > span {
+  position: absolute;
+  left: 16px;
+  top: -1px;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--color-fg);
+  text-shadow:
+    0 0 3px var(--color-sunken),
+    0 0 3px var(--color-sunken);
+}
+.wpw-marker-geoip > span {
+  color: var(--color-accent2);
+}
+.wpw-legend {
+  display: inline-block;
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+
+/* Tab strips scroll sideways without a visible scrollbar */
+.scrollbar-none {
+  scrollbar-width: none;
+}

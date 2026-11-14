@@ -49,6 +49,38 @@
         </table>
       </div>
 
+      <h2><code>wepwawet locate TARGET</code></h2>
+      <p>
+        Locate an IP address or hostname from the terminal and print the evidence. Progress goes to stderr, the report
+        to stdout.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Option</th>
+              <th>Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>--json</code></td>
+              <td>Print the full report as JSON (for scripts).</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2><code>wepwawet providers</code></h2>
+      <p>List the sources and whether each can run now (a missing key or database is named).</p>
+
+      <h2><code>wepwawet data update</code> / <code>wepwawet data status</code></h2>
+      <p>
+        Download the free GeoIP databases, or list the installed ones.
+        <code>--only dbip|ipinfo|geolite</code> (repeatable) limits the update. A failed download never replaces a
+        working database.
+      </p>
+
       <h2><code>wepwawet serve</code></h2>
       <p>Start only the local server and print the address to open, including the session token.</p>
       <div class="table-wrap">
@@ -62,10 +94,7 @@
           <tbody>
             <tr>
               <td><code>--host HOST</code></td>
-              <td>
-                Address to listen on. Non-loopback addresses need
-                <code>server.allow_remote = true</code>.
-              </td>
+              <td>Address to listen on. Non-loopback addresses need <code>server.allow_remote = true</code>.</td>
             </tr>
             <tr>
               <td><code>--port PORT</code></td>
@@ -77,8 +106,8 @@
 
       <h2><code>wepwawet doctor</code></h2>
       <p>
-        Check Python, the configuration, the directories, the window engine (Qt WebEngine and a display) and the local
-        traceroute tools. Exits with 1 when a check fails.
+        Check Python, the configuration, the directories, the window engine and the local traceroute tools. Exits with 1
+        when a check fails.
       </p>
 
       <h2><code>wepwawet version</code>, <code>--version</code>, <code>-V</code></h2>
@@ -100,11 +129,11 @@
             </tr>
             <tr>
               <td><code>1</code></td>
-              <td>A <code>doctor</code> check failed</td>
+              <td>A <code>doctor</code> check or a database download failed</td>
             </tr>
             <tr>
               <td><code>2</code></td>
-              <td>Invalid configuration or arguments, or the window cannot open</td>
+              <td>Invalid input, configuration or arguments, or the window cannot open</td>
             </tr>
           </tbody>
         </table>
@@ -112,9 +141,8 @@
 
       <h2>Local API</h2>
       <p>
-        The interface talks to the local server over HTTP. Every route except
-        <code>/api/health</code> needs the session token (cookie set by <code>/auth?token=…</code>, or
-        <code>Authorization: Bearer</code>).
+        The interface talks to the local server over HTTP. Every route except <code>/api/health</code> needs the session
+        token (cookie set by <code>/auth?token=…</code>, or <code>Authorization: Bearer</code>).
       </p>
       <div class="table-wrap">
         <table>
@@ -134,16 +162,31 @@
               <td>Version and base map settings</td>
             </tr>
             <tr>
+              <td><code>GET /api/providers</code></td>
+              <td>Sources, each with the reason it cannot run (or <code>null</code>)</td>
+            </tr>
+            <tr>
+              <td><code>POST /api/runs</code></td>
+              <td>Body <code>{"query": "…"}</code>; starts a run (202), 409 while another runs</td>
+            </tr>
+            <tr>
+              <td><code>GET /api/runs</code>, <code>GET /api/runs/{id}</code></td>
+              <td>Recent runs; one full report</td>
+            </tr>
+            <tr>
+              <td><code>DELETE /api/runs/{id}</code></td>
+              <td>Cancel a running run</td>
+            </tr>
+            <tr>
               <td><code>GET /api/events</code></td>
-              <td>Server-sent events: <code>ready</code>, then heartbeats</td>
+              <td>Server-sent events: <code>ready</code>, <code>run</code>, <code>target</code>, <code>log</code></td>
             </tr>
           </tbody>
         </table>
       </div>
     </main>
     <footer class="site">
-      Wepwawet 0.1.1 · MIT licence ·
-      <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 0.2.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

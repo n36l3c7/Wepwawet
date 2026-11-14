@@ -42,10 +42,14 @@ default_ttl_seconds = 86400
 ttl_seconds = { rdap = 604800 }   # per-source overrides
 
 [logging]
-level = "INFO"       # DEBUG, INFO, WARNING, ERROR</code></pre>
-      <p>
-        An unknown key or an invalid value stops Wepwawet with a message naming the key, so a typo never goes unnoticed.
-      </p>
+level = "INFO"       # DEBUG, INFO, WARNING, ERROR
+
+[providers.rdns]
+sweep = true         # PTR lookups of the /24 neighbours
+
+[providers.shodan]
+enabled = false      # turn any source off</code></pre>
+      <p>An unknown key or an invalid value stops Wepwawet with a message naming the key.</p>
 
       <div class="table-wrap">
         <table>
@@ -70,9 +74,7 @@ level = "INFO"       # DEBUG, INFO, WARNING, ERROR</code></pre>
             <tr>
               <td><code>server.allow_remote</code></td>
               <td><code>false</code></td>
-              <td>
-                Allow a non-loopback <code>host</code> and any <code>Host</code> header. Only for a trusted network.
-              </td>
+              <td>Allow a non-loopback <code>host</code>. Only for a trusted network.</td>
             </tr>
             <tr>
               <td><code>map.basemap</code></td>
@@ -82,21 +84,95 @@ level = "INFO"       # DEBUG, INFO, WARNING, ERROR</code></pre>
             <tr>
               <td><code>cache.default_ttl_seconds</code></td>
               <td><code>86400</code></td>
-              <td>How long provider answers stay cached.</td>
+              <td>How long source answers stay cached.</td>
             </tr>
             <tr>
               <td><code>cache.ttl_seconds</code></td>
               <td><code>{}</code></td>
-              <td>Cache time per source, overriding the default.</td>
+              <td>
+                Cache time per source (<code>ripestat</code>, <code>rdap</code>, <code>rdns</code>,
+                <code>peeringdb</code>…).
+              </td>
             </tr>
             <tr>
               <td><code>logging.level</code></td>
               <td><code>INFO</code></td>
               <td>Log level for the terminal and the log file.</td>
             </tr>
+            <tr>
+              <td><code>providers.&lt;name&gt;.enabled</code></td>
+              <td><code>true</code></td>
+              <td>
+                Turn a source off: <code>geoip</code>, <code>ipmap</code>, <code>ripestat</code>, <code>rdap</code>,
+                <code>rdns</code>, <code>internetdb</code>, <code>shodan</code>, <code>censys</code>,
+                <code>peeringdb</code>, <code>classify</code>.
+              </td>
+            </tr>
+            <tr>
+              <td><code>providers.rdns.sweep</code></td>
+              <td><code>true</code></td>
+              <td>Look up the PTR of the 254 neighbours in the target's /24 (IPv4).</td>
+            </tr>
           </tbody>
         </table>
       </div>
+
+      <h2 id="keys">API keys</h2>
+      <p>
+        Keys go in environment variables or in <code>~/.config/wepwawet/secrets.toml</code>, which must be readable by
+        you only (<code>chmod 600</code>; Wepwawet refuses a looser file):
+      </p>
+      <pre><code>[keys]
+ipinfo = "…"
+maxmind_account_id = "…"
+maxmind_license_key = "…"
+peeringdb = "…"
+shodan = "…"
+censys = "…"</code></pre>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Variable</th>
+              <th>Used for</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>ipinfo</code></td>
+              <td><code>WEPWAWET_IPINFO</code></td>
+              <td>Downloading IPinfo Lite (free token)</td>
+            </tr>
+            <tr>
+              <td><code>maxmind_account_id</code>, <code>maxmind_license_key</code></td>
+              <td><code>WEPWAWET_MAXMIND_ACCOUNT_ID</code>, <code>WEPWAWET_MAXMIND_LICENSE_KEY</code></td>
+              <td>Downloading GeoLite2 City and ASN (free account)</td>
+            </tr>
+            <tr>
+              <td><code>peeringdb</code></td>
+              <td><code>WEPWAWET_PEERINGDB</code></td>
+              <td>Higher PeeringDB rate limits</td>
+            </tr>
+            <tr>
+              <td><code>shodan</code></td>
+              <td><code>WEPWAWET_SHODAN</code></td>
+              <td>Shodan host lookups (paid membership)</td>
+            </tr>
+            <tr>
+              <td><code>censys</code>, <code>censys_org_id</code></td>
+              <td><code>WEPWAWET_CENSYS</code>, <code>WEPWAWET_CENSYS_ORG_ID</code></td>
+              <td>Censys Platform host lookups (personal access token)</td>
+            </tr>
+            <tr>
+              <td><code>globalping</code>, <code>ripe_atlas</code></td>
+              <td><code>WEPWAWET_GLOBALPING</code>, <code>WEPWAWET_RIPE_ATLAS</code></td>
+              <td>Measurements, from v0.3.0</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Keys are never logged, never shown in the interface and never stored in the cache.</p>
 
       <h2>Environment variables</h2>
       <div class="table-wrap">
@@ -140,27 +216,22 @@ level = "INFO"       # DEBUG, INFO, WARNING, ERROR</code></pre>
           <tbody>
             <tr>
               <td><code>~/.config/wepwawet/</code></td>
-              <td>Configuration (<code>$XDG_CONFIG_HOME</code>)</td>
+              <td><code>config.toml</code>, <code>secrets.toml</code> (<code>$XDG_CONFIG_HOME</code>)</td>
             </tr>
             <tr>
               <td><code>~/.local/share/wepwawet/</code></td>
-              <td>Log file, history from v0.5.0 (<code>$XDG_DATA_HOME</code>)</td>
+              <td>GeoIP databases in <code>geoip/</code>, log file (<code>$XDG_DATA_HOME</code>)</td>
             </tr>
             <tr>
               <td><code>~/.cache/wepwawet/</code></td>
-              <td>Cache of provider answers; safe to delete (<code>$XDG_CACHE_HOME</code>)</td>
+              <td>Cache of source answers; safe to delete (<code>$XDG_CACHE_HOME</code>)</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <p>
-        The directories are created readable by you only. Tokens and API keys are replaced with <code>***</code> in
-        every log line.
-      </p>
     </main>
     <footer class="site">
-      Wepwawet 0.1.1 · MIT licence ·
-      <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 0.2.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

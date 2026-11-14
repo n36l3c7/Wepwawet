@@ -61,11 +61,26 @@ class LoggingConfig(_Section):
     level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
 
+class ProviderSettings(BaseModel):
+    """``[providers.<name>]``: ``enabled`` plus options specific to that provider."""
+
+    model_config = ConfigDict(extra="allow")
+
+    enabled: bool = True
+
+    def option(self, key: str, default: Any) -> Any:
+        return (self.model_extra or {}).get(key, default)
+
+
 class Config(_Section):
     server: ServerConfig = Field(default_factory=ServerConfig)
     map: MapConfig = Field(default_factory=MapConfig)
     cache: CacheConfig = Field(default_factory=CacheConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    providers: dict[str, ProviderSettings] = Field(default_factory=dict)
+
+    def provider(self, name: str) -> ProviderSettings:
+        return self.providers.get(name) or ProviderSettings()
 
     def check_bind_address(self) -> None:
         if self.server.host not in LOOPBACK_HOSTS and not self.server.allow_remote:

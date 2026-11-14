@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { Map as MapLibreMap, NavigationControl, setWorkerUrl } from 'maplibre-gl'
+import { Map as MapLibreMap, Marker, NavigationControl, setWorkerUrl } from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { BASEMAPS, offlineStyle, readPalette, themeCartoStyle } from '../../lib/basemaps.js'
+import { POINT_KINDS, accuracyCircles, frameBounds } from '../../lib/overlays.js'
 import AsciiJackal from '../ui/AsciiJackal.jsx'
 
 // The bundled build cannot find MapLibre's worker next to itself; point it to Vite's copy.
 setWorkerUrl(maplibreWorkerUrl)
 
 const INITIAL_VIEW = { center: [12, 30], zoom: 1.6 }
+const CIRCLES_SOURCE = 'wpw-accuracy'
 
 // Natural Earth 1:50m (~750 kB): a separate chunk, loaded only for the offline map.
 const loadCountries = () => import('world-atlas/countries-50m.json').then((module) => module.default)
@@ -28,9 +30,52 @@ async function loadStyle(basemap, cartoStyleUrl, palette, signal) {
   return offlineStyle(await loadCountries(), palette)
 }
 
-export default function MapView({ basemap, cartoStyleUrl, onBasemapChange, onLog }) {
+/** Accuracy circles live in the style, so they are added again after every style change. */
+function drawCircles(map, circles) {
+  if (!map.isStyleLoaded()) return
+  const palette = readPalette()
+  const source = map.getSource(CIRCLES_SOURCE)
+  if (source) {
+    source.setData(circles)
+    return
+  }
+  map.addSource(CIRCLES_SOURCE, { type: 'geojson', data: circles })
+  map.addLayer({
+    id: `${CIRCLES_SOURCE}-fill`,
+    type: 'fill',
+    source: CIRCLES_SOURCE,
+    paint: { 'fill-color': palette.accent2, 'fill-opacity': 0.06 },
+  })
+  map.addLayer({
+    id: `${CIRCLES_SOURCE}-line`,
+    type: 'line',
+    source: CIRCLES_SOURCE,
+    paint: { 'line-color': palette.accent2, 'line-opacity': 0.55, 'line-width': 1, 'line-dasharray': [3, 2] },
+  })
+}
+
+/** HTML markers survive style changes and need no glyph server (the offline map has none). */
+function markerElement(point) {
+  const element = document.createElement('div')
+  element.className = `wpw-marker wpw-marker-${point.kind}`
+  element.title = point.title
+  element.setAttribute('role', 'img')
+  element.setAttribute('aria-label', `${POINT_KINDS[point.kind]?.label ?? 'Point'}: ${point.title}`)
+  const shape = document.createElement('i')
+  shape.className = 'wpw-shape'
+  element.appendChild(shape)
+  if (point.kind !== 'facility') {
+    const label = document.createElement('span')
+    label.textContent = point.label
+    element.appendChild(label)
+  }
+  return element
+}
+
+export default function MapView({ basemap, cartoStyleUrl, points, onBasemapChange, onLog }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
+  const circlesRef = useRef(accuracyCircles([]))
   const [webglError, setWebglError] = useState(null)
   const [cursor, setCursor] = useState(null)
 
@@ -52,6 +97,7 @@ export default function MapView({ basemap, cartoStyleUrl, onBasemapChange, onLog
     map.addControl(new NavigationControl({ showCompass: false }), 'bottom-right')
     map.on('mousemove', (event) => setCursor(event.lngLat))
     map.on('mouseout', () => setCursor(null))
+    map.on('style.load', () => drawCircles(map, circlesRef.current))
     mapRef.current = map
     return () => {
       map.remove()
@@ -59,14 +105,12 @@ export default function MapView({ basemap, cartoStyleUrl, onBasemapChange, onLog
     }
   }, [])
 
-  // Switch base map.
+  // Switch base map. Wait for the server settings before loading CARTO, or the offline map would flash first.
   useEffect(() => {
     const map = mapRef.current
-    // Wait for the server settings before loading CARTO, or the offline map would flash first.
     if (!map || (basemap === 'carto' && !cartoStyleUrl)) return undefined
     const controller = new AbortController()
-    const palette = readPalette()
-    loadStyle(basemap, cartoStyleUrl, palette, controller.signal)
+    loadStyle(basemap, cartoStyleUrl, readPalette(), controller.signal)
       .then((style) => {
         // A newer selection may have replaced this one while it loaded.
         if (!controller.signal.aborted) map.setStyle(style, { diff: false })
@@ -78,6 +122,21 @@ export default function MapView({ basemap, cartoStyleUrl, onBasemapChange, onLog
       })
     return () => controller.abort()
   }, [basemap, cartoStyleUrl, onBasemapChange, onLog])
+
+  // Points and circles of the current report.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return undefined
+    circlesRef.current = accuracyCircles(points)
+    drawCircles(map, circlesRef.current)
+    const ordered = [...points].sort((a, b) => (POINT_KINDS[b.kind]?.order ?? 0) - (POINT_KINDS[a.kind]?.order ?? 0))
+    const markers = ordered.map((point) =>
+      new Marker({ element: markerElement(point), anchor: 'center' }).setLngLat([point.lon, point.lat]).addTo(map),
+    )
+    const bounds = frameBounds(points)
+    if (bounds) map.fitBounds(bounds, { padding: 80, maxZoom: 8, duration: 800 })
+    return () => markers.forEach((marker) => marker.remove())
+  }, [points])
 
   if (webglError) {
     return (
@@ -118,6 +177,18 @@ export default function MapView({ basemap, cartoStyleUrl, onBasemapChange, onLog
           </button>
         ))}
       </div>
+      {points.length ? (
+        <div className="absolute left-2.5 top-2.5 grid gap-1 border border-line bg-sunken/90 px-2.5 py-1.5 font-mono text-[10.5px] text-fg-muted">
+          {Object.entries(POINT_KINDS).map(([kind, { label }]) => (
+            <span key={kind} className="flex items-center gap-2">
+              <span aria-hidden="true" className={`wpw-marker wpw-marker-${kind} wpw-legend`}>
+                <i className="wpw-shape" />
+              </span>
+              {label}
+            </span>
+          ))}
+        </div>
+      ) : null}
       <div className="pointer-events-none absolute bottom-2.5 left-2.5 border border-line bg-sunken/90 px-2 py-1 font-mono text-[10.5px] tabular-nums text-fg-muted">
         {cursor ? `${cursor.lat.toFixed(4)}, ${cursor.lng.toFixed(4)}` : 'lat, lon'}
       </div>

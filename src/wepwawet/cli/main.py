@@ -4,10 +4,12 @@ Like Wireshark: ``wepwawet`` alone opens the application window; sub-commands
 work in the terminal.
 """
 
+import asyncio
 from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from wepwawet import __version__
@@ -118,6 +120,108 @@ def doctor() -> None:
 def version() -> None:
     """Show the version."""
     console.print(f"wepwawet {__version__}")
+
+
+@app.command()
+def locate(
+    target: Annotated[str, typer.Argument(help="IP address or hostname.")],
+    as_json: Annotated[bool, typer.Option("--json", help="Print the full report as JSON.")] = False,
+) -> None:
+    """Locate an address from the terminal and print the evidence."""
+    from wepwawet.cli.report import print_run
+    from wepwawet.core.context import build_context, enabled_enrichment
+    from wepwawet.core.models import RunReport, RunStatus
+    from wepwawet.core.pipeline import Pipeline
+    from wepwawet.core.secrets import SecretsError
+
+    config = _load()
+
+    def show(level: str, source: str, message: str) -> None:
+        if not as_json:
+            style = {"error": "red", "ok": "green"}.get(level, "dim")
+            err_console.print(rf"[{style}]\[{escape(source)}][/] {escape(message)}")
+
+    try:
+        ctx = build_context(config, default_paths(), log=show)
+    except SecretsError as exc:
+        err_console.print(f"[red]{exc}[/]")
+        raise typer.Exit(2) from exc
+
+    def emit(name: str, data: dict[str, object]) -> None:
+        if name == "log":
+            show(str(data["level"]), str(data["source"]), str(data["message"]))
+
+    async def go() -> RunReport:
+        try:
+            return await Pipeline(ctx, enabled_enrichment(config), emit).run(RunReport(id="cli", query=target))
+        finally:
+            await ctx.http.aclose()
+
+    report = asyncio.run(go())
+    if as_json:
+        console.print_json(report.model_dump_json())
+    else:
+        print_run(console, report)
+    if report.status is RunStatus.FAILED:
+        raise typer.Exit(2)
+
+
+@app.command()
+def providers() -> None:
+    """List the data sources and whether each can run now."""
+    from wepwawet.core.context import build_context, enabled_enrichment
+
+    config = _load()
+    ctx = build_context(config, default_paths())
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("Source")
+    table.add_column("Status")
+    table.add_column("Note", overflow="fold")
+    for provider in enabled_enrichment(config):
+        reason = provider.unavailable_reason(ctx)
+        table.add_row(provider.label, "[yellow]unavailable[/]" if reason else "[green]ready[/]", reason or "")
+    console.print(table)
+
+
+data_app = typer.Typer(help="Download and inspect reference data (GeoIP databases).", no_args_is_help=True)
+app.add_typer(data_app, name="data")
+
+
+@data_app.command("update")
+def data_update(
+    only: Annotated[
+        list[str] | None, typer.Option("--only", help="dbip, ipinfo or geolite (repeatable). Default: all.")
+    ] = None,
+) -> None:
+    """Download the free GeoIP databases (DB-IP Lite always; IPinfo and GeoLite2 when keys are set)."""
+    from wepwawet.core.secrets import load_secrets
+    from wepwawet.data.updater import GeoipUpdater
+
+    _load()
+    paths = default_paths()
+    updater = GeoipUpdater(paths.data_dir / "geoip", load_secrets(paths.config_dir / "secrets.toml"))
+    try:
+        results = updater.update_all(set(only) if only else None, progress=lambda m: err_console.print(f"[dim]{m}[/]"))
+    finally:
+        updater.close()
+    style = {"updated": "green", "skipped": "yellow", "failed": "red"}
+    for result in results:
+        console.print(f"[{style[result.status]}]{result.status:8}[/] {result.name}: {result.message}")
+    if any(r.status == "failed" for r in results):
+        raise typer.Exit(1)
+
+
+@data_app.command("status")
+def data_status() -> None:
+    """Show the installed GeoIP databases."""
+    paths = default_paths()
+    directory = paths.data_dir / "geoip"
+    files = sorted(directory.glob("*.mmdb")) if directory.is_dir() else []
+    if not files:
+        console.print("No GeoIP database installed. Run: wepwawet data update")
+        return
+    for path in files:
+        console.print(f"{path.name:28} {path.stat().st_size / 2**20:7.1f} MiB")
 
 
 def run() -> None:

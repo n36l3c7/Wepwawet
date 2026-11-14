@@ -45,3 +45,22 @@ export function subscribeEvents(handlers, onState = () => {}) {
     source.close()
   }
 }
+
+async function sendJson(method, path, body) {
+  const response = await fetch(path, {
+    method,
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    const detail = Array.isArray(data.detail) ? data.detail.map((d) => d.msg).join('; ') : data.detail
+    throw new ApiError(response.status, detail)
+  }
+  return data
+}
+
+export const fetchProviders = (options) => getJson('/api/providers', options)
+export const startRun = (query) => sendJson('POST', '/api/runs', { query })
+export const cancelRun = (id) => sendJson('DELETE', `/api/runs/${encodeURIComponent(id)}`)

@@ -62,3 +62,6 @@ def setup_logging(level: str = "INFO", log_file: Path | None = None) -> None:
         handler.addFilter(RedactingFilter())
         handler.setFormatter(KeyValueFormatter())
         root.addHandler(handler)
+    # HTTP client libraries log every request URL at INFO; some URLs carry API keys.
+    for noisy in ("httpx", "httpcore", "hpack"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)

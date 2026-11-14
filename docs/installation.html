@@ -30,10 +30,7 @@
         <li>Tested on Debian 13, Ubuntu 22.04 and 24.04, Kali Rolling, Fedora 43 and Arch Linux.</li>
         <li>On arm64, glibc 2.39 or newer (Ubuntu 24.04+, Debian 13+), required by Qt.</li>
         <li>About 190 MB to download and 515 MB of disk. The packages bring their own Python 3.12 and Qt WebEngine.</li>
-        <li>
-          An X11 or Wayland session for the window; without one, use
-          <code>wepwawet serve</code>.
-        </li>
+        <li>An X11 or Wayland session for the window; without one, use <code>wepwawet serve</code>.</li>
       </ul>
 
       <h2>Install a package</h2>
@@ -43,24 +40,42 @@
         <code>SHA256SUMS</code> file.
       </p>
       <h3>Debian, Ubuntu, Kali</h3>
-      <pre><code>sudo apt install ./wepwawet_0.1.1-1_amd64.deb</code></pre>
+      <pre><code>sudo apt install ./wepwawet_0.2.0-1_amd64.deb</code></pre>
       <h3>Fedora</h3>
-      <pre><code>sudo dnf install ./wepwawet-0.1.1-1.x86_64.rpm</code></pre>
+      <pre><code>sudo dnf install ./wepwawet-0.2.0-1.x86_64.rpm</code></pre>
       <h3>Arch Linux</h3>
-      <pre><code>sudo pacman -U wepwawet-0.1.1-1-x86_64.pkg.tar.zst</code></pre>
+      <pre><code>sudo pacman -U wepwawet-0.2.0-1-x86_64.pkg.tar.zst</code></pre>
       <p>
-        The packages install the system libraries Qt needs. They recommend
-        <code>mtr</code> and <code>traceroute</code>, which Wepwawet will use to measure from this machine.
+        The packages install the system libraries Qt needs. They recommend <code>mtr</code> and <code>traceroute</code>,
+        which Wepwawet will use to measure from this machine.
       </p>
 
       <h3>AppImage</h3>
-      <pre><code>chmod +x Wepwawet-0.1.1-x86_64.AppImage
-./Wepwawet-0.1.1-x86_64.AppImage</code></pre>
+      <pre><code>chmod +x Wepwawet-0.2.0-x86_64.AppImage
+./Wepwawet-0.2.0-x86_64.AppImage</code></pre>
       <p>
         An AppImage needs <code>libfuse2</code>; without it, add <code>--appimage-extract-and-run</code>. It also
         expects the libraries Qt WebEngine loads. On Debian-based systems:
       </p>
       <pre><code>sudo apt install libgl1 libegl1 libfontconfig1 libdbus-1-3 libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libx11-xcb1 libnss3 libxcomposite1 libxdamage1 libxrandr2 libxtst6 libxkbfile1 libxfixes3 libgssapi-krb5-2 libglib2.0-0t64 libasound2t64 liblcms2-2 libminizip1t64 libopus0 libsnappy1v5 libwebp7 libwebpdemux2 libwebpmux3</code></pre>
+
+      <h2>Download the GeoIP databases</h2>
+      <p>
+        The databases are not shipped with the packages (their licences require it). Download them once, then monthly:
+      </p>
+      <pre><code>wepwawet data update</code></pre>
+      <ul>
+        <li>
+          <strong>DB-IP Lite City</strong> is always downloaded: no account needed. IP geolocation by
+          <a href="https://db-ip.com">DB-IP</a>, CC BY 4.0.
+        </li>
+        <li><strong>IPinfo Lite</strong> (country and ASN) needs a free token from ipinfo.io.</li>
+        <li><strong>MaxMind GeoLite2</strong> City and ASN need a free MaxMind account ID and licence key.</li>
+      </ul>
+      <p>
+        See <a href="configuration.html#keys">API keys</a> for where to put tokens. Even without any database, RIPEstat
+        serves the GeoLite2 answer for each lookup.
+      </p>
 
       <h2>Check the installation</h2>
       <pre><code>wepwawet doctor</code></pre>
@@ -71,9 +86,8 @@
 
       <h2>Measuring from this machine</h2>
       <p>
-        Traceroute needs raw sockets. On Debian, Ubuntu and Kali,
-        <code>mtr</code> already works without root. For <code>scamper</code>, give the capability to the tool, never to
-        Wepwawet, and never run Wepwawet as root:
+        Traceroute needs raw sockets. On Debian, Ubuntu and Kali, <code>mtr</code> already works without root. For
+        <code>scamper</code>, give the capability to the tool, never to Wepwawet, and never run Wepwawet as root:
       </p>
       <pre><code>sudo setcap cap_net_raw+ep "$(command -v scamper)"</code></pre>
 
@@ -87,18 +101,14 @@ sudo pacman -R wepwawet       # Arch Linux</code></pre>
       </p>
 
       <h2>From source</h2>
-      <p>
-        For development, with Python 3.12,
-        <a href="https://docs.astral.sh/uv/">uv</a> and Node.js 22:
-      </p>
+      <p>For development, with Python 3.12, <a href="https://docs.astral.sh/uv/">uv</a> and Node.js 22:</p>
       <pre><code>git clone https://github.com/n36l3c7/Wepwawet.git &amp;&amp; cd Wepwawet
 uv sync --extra gui
 (cd frontend &amp;&amp; npm ci &amp;&amp; npm run build)
 uv run wepwawet</code></pre>
     </main>
     <footer class="site">
-      Wepwawet 0.1.1 · MIT licence ·
-      <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 0.2.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

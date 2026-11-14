@@ -1,6 +1,6 @@
 [project]
 name = "wepwawet"
-version = "0.1.1"
+version = "0.2.0"
 description = "Measurement-based IP geolocation: passive evidence plus ping and traceroute from many vantage points, on a map."
 readme = "README.md"
 license = "MIT"
@@ -25,6 +25,8 @@ dependencies = [
   "sqlalchemy>=2.0.36",
   "typer>=0.15",
   "rich>=13.9",
+  "maxminddb>=3.0",
+  "dnspython>=2.7",
 ]
 
 [project.optional-dependencies]
@@ -41,7 +43,14 @@ Documentation = "https://n36l3c7.github.io/Wepwawet/"
 Changelog = "https://github.com/n36l3c7/Wepwawet/blob/main/CHANGELOG.md"
 
 [dependency-groups]
-dev = ["pytest>=8.3", "ruff>=0.8", "mypy>=1.13", "pre-commit>=4.0"]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "pre-commit>=4.0",
+    "respx>=0.22",
+    "pytest-asyncio>=0.24",
+]
 
 [build-system]
 requires = ["hatchling>=1.26"]
@@ -84,3 +93,6 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = ["ignore::DeprecationWarning:starlette.*", "ignore:Using `httpx` with:DeprecationWarning"]

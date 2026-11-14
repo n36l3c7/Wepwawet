@@ -6,7 +6,7 @@ Coordinates are WGS84 decimal degrees; distances are kilometres; times are milli
 import ipaddress
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -85,15 +85,54 @@ class EvidenceKind(StrEnum):
     HARD = "hard"  # physical constraint (RTT); never violated by the estimate
     SOFT = "soft"  # hint that ranks candidates (GeoIP, PTR, PeeringDB, RDAP)
     NEGATIVE = "negative"  # rules a place out
+    INFO = "info"  # context without a location (routing, registration, classification)
 
 
 class Evidence(_Model):
+    """One finding of one source. ``details`` keeps the structured facts behind ``summary``."""
+
     source: str
     kind: EvidenceKind
     summary: str
+    label: str | None = None  # short name on the map, e.g. the database or facility name
     point: GeoPoint | None = None
     radius_km: float | None = Field(default=None, gt=0)
     weight: float = Field(default=1.0, ge=0, le=1)
+    city: str | None = None
+    country: str | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class NetworkClass(StrEnum):
+    RESIDENTIAL = "residential"
+    MOBILE = "mobile"
+    HOSTING = "hosting"
+    CDN = "cdn"
+    VPN = "vpn"
+    EDUCATION = "education"
+    BUSINESS = "business"
+    UNKNOWN = "unknown"
+
+
+class NetworkInfo(_Model):
+    """Routing and registration facts about the target's prefix."""
+
+    prefix: str | None = None
+    asn: int | None = None
+    as_name: str | None = None
+    announced: bool | None = None
+    rir: str | None = None
+    rir_country: str | None = None
+    netname: str | None = None
+    holder: str | None = None
+
+
+class ProviderStatus(_Model):
+    provider: str
+    status: Literal["ok", "empty", "skipped", "error"]
+    message: str = ""
+    duration_ms: float = 0
+    cached: bool = False
 
 
 class Estimate(_Model):
@@ -104,3 +143,38 @@ class Estimate(_Model):
     country: str | None = Field(default=None, min_length=2, max_length=2)
     explanation: tuple[str, ...] = ()
     anycast: bool = False
+
+
+class RunStatus(StrEnum):
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class TargetReport(BaseModel):
+    """Everything known about one address. Mutable: the pipeline fills it phase by phase."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    target: Target
+    network: NetworkInfo | None = None
+    classification: list[NetworkClass] = Field(default_factory=list)
+    caveats: list[str] = Field(default_factory=list)
+    evidence: list[Evidence] = Field(default_factory=list)
+    providers: list[ProviderStatus] = Field(default_factory=list)
+    estimate: Estimate | None = None
+
+
+class RunReport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    query: str
+    hostname: str | None = None
+    status: RunStatus = RunStatus.RUNNING
+    started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    finished_at: datetime | None = None
+    targets: list[TargetReport] = Field(default_factory=list)
+    skipped: list[tuple[str, str]] = Field(default_factory=list)
+    error: str | None = None

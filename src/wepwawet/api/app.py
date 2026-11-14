@@ -12,14 +12,24 @@ import asyncio
 import json
 import secrets
 from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
 from wepwawet import __version__
+from wepwawet.api.services import Services, default_services
 from wepwawet.config import LOOPBACK_HOSTS, Config
+from wepwawet.core.events import EventBus
+
+
+class RunRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=300)
+
 
 SESSION_COOKIE = "wepwawet_session"
 CARTO_STYLE_URL = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
@@ -81,12 +91,29 @@ def create_app(
     sse_heartbeat_seconds: float = 15.0,
     sse_max_heartbeats: int | None = None,
     on_ui_connected: Callable[[], None] | None = None,
+    services: Services | None = None,
 ) -> FastAPI:
     """Build the application. ``token=None`` disables authentication (tests and explicit opt-out only).
 
     ``on_ui_connected`` runs each time the interface opens the event stream (used by the smoke test).
+    ``services`` defaults to the real providers built from ``config``.
     """
-    app = FastAPI(title="Wepwawet", version=__version__, docs_url=None, redoc_url=None, openapi_url="/api/openapi.json")
+    svc = services or default_services(config)
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        yield
+        await svc.aclose()
+
+    app = FastAPI(
+        title="Wepwawet",
+        version=__version__,
+        docs_url=None,
+        redoc_url=None,
+        openapi_url="/api/openapi.json",
+        lifespan=lifespan,
+    )
+    app.state.services = svc
 
     @app.middleware("http")
     async def guard(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
@@ -121,12 +148,44 @@ def create_app(
             "basemaps": {"carto": {"style": CARTO_STYLE_URL}, "offline": {}},
         }
 
+    @app.get("/api/providers")
+    def providers() -> list[dict[str, Any]]:
+        return svc.provider_status()
+
+    @app.post("/api/runs", status_code=202)
+    async def start_run(body: RunRequest) -> dict[str, Any]:
+        try:
+            run = svc.runs.start(body.query)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return run.model_dump(mode="json")
+
+    @app.get("/api/runs")
+    def list_runs() -> list[dict[str, Any]]:
+        return [
+            {"id": r.id, "query": r.query, "status": r.status, "started_at": r.started_at.isoformat()}
+            for r in svc.runs.list()
+        ]
+
+    @app.get("/api/runs/{run_id}")
+    def get_run(run_id: str) -> dict[str, Any]:
+        run = svc.runs.get(run_id)
+        if run is None:
+            raise HTTPException(status_code=404, detail="No such run")
+        return run.model_dump(mode="json")
+
+    @app.delete("/api/runs/{run_id}")
+    def cancel_run(run_id: str) -> dict[str, bool]:
+        if svc.runs.get(run_id) is None:
+            raise HTTPException(status_code=404, detail="No such run")
+        return {"cancelled": svc.runs.cancel(run_id)}
+
     @app.get("/api/events")
     async def events(request: Request) -> StreamingResponse:
         if on_ui_connected is not None:
             on_ui_connected()
         return StreamingResponse(
-            _event_stream(request, sse_heartbeat_seconds, sse_max_heartbeats),
+            _event_stream(request, svc.bus, sse_heartbeat_seconds, sse_max_heartbeats),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
         )
@@ -146,12 +205,19 @@ def format_event(event: str, data: object) -> str:
     return f"event: {event}\ndata: {json.dumps(data, separators=(',', ':'))}\n\n"
 
 
-async def _event_stream(request: Request, heartbeat: float, max_heartbeats: int | None) -> AsyncIterator[str]:
-    yield format_event("ready", {"version": __version__})
-    sent = 0
-    while max_heartbeats is None or sent < max_heartbeats:
-        await asyncio.sleep(heartbeat)
-        if await request.is_disconnected():
-            return
-        yield ": heartbeat\n\n"
-        sent += 1
+async def _event_stream(
+    request: Request, bus: EventBus, heartbeat: float, max_heartbeats: int | None
+) -> AsyncIterator[str]:
+    async with bus.subscribe() as queue:
+        yield format_event("ready", {"version": __version__})
+        idle = 0
+        while max_heartbeats is None or idle < max_heartbeats:
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=heartbeat)
+            except TimeoutError:
+                if await request.is_disconnected():
+                    return
+                yield ": heartbeat\n\n"
+                idle += 1
+                continue
+            yield format_event(event.name, event.data)

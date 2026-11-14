@@ -46,12 +46,13 @@
         on a map. Named after the Egyptian god Wepwawet, the jackal "opener of the ways".
       </p>
       <div class="note">
-        <strong>v0.1.0 is the first release.</strong> It ships the application: the window, the map, the local server,
-        the command line and the Linux packages. Locating targets starts in v0.2.0.
+        <strong>v0.2.0: passive evidence.</strong> Wepwawet reads every passive source about an address (GeoIP
+        databases, RIPE IPmap, RIPEstat, RDAP, reverse DNS, PeeringDB, Shodan, Censys) and classifies the network. Ping
+        and traceroute measurements arrive in v0.3.0.
       </div>
       <img
         src="img/main-window.png"
-        alt="The Wepwawet window: a dark map of the world, a side panel with the jackal and the known limits, and a live log at the bottom."
+        alt="Wepwawet locating 193.0.6.139: the map of the Netherlands with the GeoIP answers and RIPE IPmap on Amsterdam, a side panel with the prefix, the origin AS and the registration, and a live log at the bottom."
         width="1416"
         height="808"
       />
@@ -107,11 +108,13 @@
           <tbody>
             <tr>
               <td>0.1.0</td>
-              <td>Application, map, local server, CLI, Linux packages</td>
+              <td>Application, map, local server, CLI, Linux packages (done)</td>
             </tr>
             <tr>
               <td>0.2.0</td>
-              <td>Passive enrichment: GeoIP, RIPEstat, RDAP, reverse DNS, PeeringDB, Shodan, Censys</td>
+              <td>
+                Passive enrichment: GeoIP, RIPE IPmap, RIPEstat, RDAP, reverse DNS, PeeringDB, Shodan, Censys (done)
+              </td>
             </tr>
             <tr>
               <td>0.3.0</td>
@@ -134,8 +137,7 @@
       </div>
     </main>
     <footer class="site">
-      Wepwawet 0.1.1 · MIT licence ·
-      <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 0.2.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

@@ -23,45 +23,47 @@
     <main>
       <h1>Changelog</h1>
       <p class="lede">
-        The full history is in
-        <a href="https://github.com/n36l3c7/Wepwawet/blob/main/CHANGELOG.md">CHANGELOG.md</a>. Versions follow Semantic
-        Versioning.
+        The full history is in <a href="https://github.com/n36l3c7/Wepwawet/blob/main/CHANGELOG.md">CHANGELOG.md</a>.
+        Versions follow Semantic Versioning.
       </p>
+
+      <h2>0.2.0 · 2026-11-15</h2>
+      <p>Passive evidence: Wepwawet now looks addresses up.</p>
+      <h3>Added</h3>
+      <ul>
+        <li>
+          Input validation: IPv4, IPv6 and hostnames (every A and AAAA record); special-purpose ranges are refused with
+          the reason.
+        </li>
+        <li>
+          Sources: local GeoIP databases, RIPE IPmap, RIPEstat, RDAP, reverse DNS with a /24 neighbour sweep, PeeringDB,
+          Shodan InternetDB, Shodan and Censys.
+        </li>
+        <li>
+          Network classification (residential, mobile, hosting, CDN, VPN, education) with caveats shown in the
+          interface.
+        </li>
+        <li>
+          <code>wepwawet locate</code>, <code>wepwawet providers</code>, <code>wepwawet data update|status</code>.
+        </li>
+        <li>
+          Interface: Run and Stop, live progress, Summary, Evidence and Raw tabs, GeoIP answers with accuracy circles,
+          located answers and PeeringDB facilities on the map.
+        </li>
+        <li>API keys from environment variables or a private <code>secrets.toml</code>.</li>
+      </ul>
 
       <h2>0.1.1 · 2026-11-14</h2>
       <h3>Fixed</h3>
       <ul>
-        <li>
-          arm64 packages: declare the system libraries Qt WebEngine links on aarch64 (lcms2, minizip, opus, snappy,
-          webp).
-        </li>
+        <li>arm64 packages: declare the system libraries Qt WebEngine links on aarch64.</li>
       </ul>
 
       <h2>0.1.0 · 2026-11-14</h2>
-      <p>First release: the application, without geolocation yet.</p>
-      <h3>Added</h3>
-      <ul>
-        <li>
-          Desktop window (Qt WebEngine): <code>wepwawet</code> with no arguments opens it;
-          <code>wepwawet gui --browser</code> opens the system browser instead.
-        </li>
-        <li>Interface with the "Sand &amp; turquoise" terminal theme and the animated ASCII jackal.</li>
-        <li>MapLibre map with CARTO dark (online, recoloured) and an offline Natural Earth map.</li>
-        <li>
-          Local API bound to loopback with a per-session token, a
-          <code>Host</code> check and a strict Content Security Policy; live log over server-sent events.
-        </li>
-        <li>
-          Command line: <code>gui</code>, <code>serve</code>, <code>doctor</code>, <code>version</code>;
-          <code>wpw</code> alias.
-        </li>
-        <li>Configuration file and environment variables, XDG directories, log redaction, SQLite cache.</li>
-        <li>Packages for x86_64 and arm64: .deb, .rpm, Arch Linux and AppImage.</li>
-      </ul>
+      <p>First release: the window, the map, the local server, the command line and the Linux packages.</p>
     </main>
     <footer class="site">
-      Wepwawet 0.1.1 · MIT licence ·
-      <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 0.2.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

@@ -8,11 +8,10 @@ Measurement-based IP geolocation for Linux: passive evidence plus ping and trace
 
 **Documentation: <https://n36l3c7.github.io/Wepwawet/>**
 
-![The Wepwawet window](docs/img/main-window.png)
+![Wepwawet locating 193.0.6.139](docs/img/main-window.png)
 
-> **Status: v0.1.1.** This version ships the application itself: the desktop window, the
-> map, the local server, the command line and the Linux packages. Locating targets starts in v0.2.0; see
-> [Roadmap](#roadmap).
+> **Status: v0.2.0.** Wepwawet reads every passive source about an address and classifies the network.
+> Ping and traceroute measurements, and the estimate built from them, arrive in v0.3.0; see [Roadmap](#roadmap).
 
 ## What it does
 
@@ -52,17 +51,17 @@ Download the package for your distribution from the
 
 ```sh
 # Debian, Ubuntu, Kali
-sudo apt install ./wepwawet_0.1.1-1_amd64.deb
+sudo apt install ./wepwawet_0.2.0-1_amd64.deb
 
 # Fedora
-sudo dnf install ./wepwawet-0.1.1-1.x86_64.rpm
+sudo dnf install ./wepwawet-0.2.0-1.x86_64.rpm
 
 # Arch Linux
-sudo pacman -U wepwawet-0.1.1-1-x86_64.pkg.tar.zst
+sudo pacman -U wepwawet-0.2.0-1-x86_64.pkg.tar.zst
 
 # Any distribution: AppImage (needs libfuse2, or run it with --appimage-extract-and-run)
-chmod +x Wepwawet-0.1.1-x86_64.AppImage
-./Wepwawet-0.1.1-x86_64.AppImage
+chmod +x Wepwawet-0.2.0-x86_64.AppImage
+./Wepwawet-0.2.0-x86_64.AppImage
 ```
 
 The packages install the system libraries Qt needs and recommend `mtr` and `traceroute` for measurements
@@ -72,12 +71,31 @@ from this machine. The AppImage expects the same libraries on the host; the list
 ## Quickstart
 
 ```sh
-wepwawet            # open the application window (also in the desktop menu)
-wepwawet doctor     # check the window, the configuration and the traceroute tools
-wepwawet --version
+wepwawet data update        # download the free DB-IP Lite database (once a month)
+wepwawet                    # open the window (also in the desktop menu)
+wepwawet locate ripe.net    # or locate from the terminal
+wepwawet doctor             # check the window, the configuration and the traceroute tools
 ```
 
 `wpw` is a short alias of `wepwawet`.
+
+## Sources
+
+| Source | Key | What it adds |
+|---|---|---|
+| GeoIP databases | no (download once) | DB-IP Lite, IPinfo Lite, GeoLite2 answers and how far apart they are |
+| RIPE IPmap | no | RIPE NCC's geolocation from crowdsourced and latency data |
+| RIPEstat | no | Routed prefix, origin AS, RIR country, GeoLite2 answer |
+| RDAP | no | Registration: block, holder, country, customer assignments |
+| Reverse DNS | no | PTR of the target and naming patterns of its /24 neighbours (DNS only) |
+| PeeringDB | optional | Facilities and exchanges of the origin network |
+| Shodan InternetDB | no | Open ports, names, tags such as `vpn` or `cloud` (non-commercial use) |
+| Shodan | yes (paid) | Shodan's host record and location |
+| Censys | yes (free plan: 100 lookups a month) | Location, DNS names, certificate subjects |
+
+Answers are cached (one day by default). The network is classified as residential, mobile, hosting, CDN,
+VPN or education from cloud ranges, PeeringDB, the AS name and PTR patterns, and the window explains
+what that means for the answer.
 
 ## Command line
 
@@ -85,6 +103,9 @@ wepwawet --version
 |---|---|
 | `wepwawet` | Open the window. Same as `wepwawet gui`. |
 | `wepwawet gui --browser` | Open the interface in the system browser instead of a window, for machines where Qt WebEngine cannot run. |
+| `wepwawet locate TARGET [--json]` | Locate an IP address or hostname and print the evidence (or the full JSON report). |
+| `wepwawet providers` | List the sources and whether each can run now. |
+| `wepwawet data update [--only dbip\|ipinfo\|geolite]` | Download the free GeoIP databases. `data status` lists them. |
 | `wepwawet serve [--host H] [--port P]` | Start only the local server and print the address to open. |
 | `wepwawet doctor` | Check Python, configuration, directories, the window and the local traceroute tools. |
 | `wepwawet version` / `--version` | Show the version. |
@@ -108,6 +129,22 @@ ttl_seconds = { rdap = 604800 }   # per-source overrides
 
 [logging]
 level = "INFO"       # DEBUG, INFO, WARNING, ERROR
+
+[providers.rdns]
+sweep = true         # PTR lookups of the /24 neighbours
+
+[providers.shodan]
+enabled = false      # any source can be turned off
+```
+
+API keys go in environment variables (`WEPWAWET_IPINFO`, `WEPWAWET_MAXMIND_ACCOUNT_ID`,
+`WEPWAWET_MAXMIND_LICENSE_KEY`, `WEPWAWET_PEERINGDB`, `WEPWAWET_SHODAN`, `WEPWAWET_CENSYS`) or in
+`~/.config/wepwawet/secrets.toml`, which must be readable by you only (`chmod 600`):
+
+```toml
+[keys]
+ipinfo = "..."
+censys = "..."
 ```
 
 | Environment variable | Overrides |
@@ -136,8 +173,8 @@ requests at all.
 
 | Version | Content |
 |---|---|
-| 0.1.0 | Application, map, local server, CLI, Linux packages |
-| 0.2.0 | Passive enrichment: GeoIP, RIPEstat, RDAP, reverse DNS, PeeringDB, Shodan, Censys |
+| 0.1.0 | Application, map, local server, CLI, Linux packages (done) |
+| 0.2.0 | Passive enrichment: GeoIP, RIPE IPmap, RIPEstat, RDAP, reverse DNS, PeeringDB, Shodan, Censys (done) |
 | 0.3.0 | Measurement providers, two-stage ping campaign, multilateration, anycast detection |
 | 0.4.0 | Traceroutes, location hints from router names, IXPs, path convergence |
 | 0.5.0 | Evidence fusion and confidence, history and diff, export, bulk mode |
@@ -175,4 +212,5 @@ vulnerability.
 
 [MIT](LICENSE). The packages bundle third-party software under its own licences: CPython (PSF), Qt and
 PySide6 (LGPLv3), MapLibre GL JS (BSD-3-Clause), Natural Earth data (public domain), Inter and JetBrains
-Mono fonts (OFL-1.1).
+Mono fonts (OFL-1.1). IP geolocation by [DB-IP](https://db-ip.com) (CC BY 4.0) when the DB-IP Lite
+database is installed.
