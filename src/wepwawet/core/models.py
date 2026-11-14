@@ -272,6 +272,7 @@ class TargetReport(BaseModel):
     traceroutes: list[TracerouteReport] = Field(default_factory=list)
     convergence: Convergence | None = None
     access: AccessDelay | None = None
+    tests_used: int = 0  # measurement tests (or credits) this address cost
     estimate: Estimate | None = None
 
 

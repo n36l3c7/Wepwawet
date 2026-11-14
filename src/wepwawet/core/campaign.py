@@ -188,6 +188,14 @@ class Campaign:
         return batch
 
     async def run(self, report: TargetReport, progress: Progress) -> None:
+        """Measure ``report``'s target; ``report.tests_used`` records the cost, whatever happens."""
+        state = CampaignState()
+        try:
+            await self._run(report, progress, state)
+        finally:
+            report.tests_used = state.tests_used
+
+    async def _run(self, report: TargetReport, progress: Progress, state: CampaignState) -> None:
         cfg = self._ctx.config.measurements
         usable = self.available()
         if not cfg.enabled or not usable:
@@ -195,7 +203,6 @@ class Campaign:
             self._log("info", "measure", f"No measurements: {reason}")
             return
         target = report.target
-        state = CampaignState()
         selectable = [p for p in usable if p.selectable]
         fixed = [p for p in usable if not p.selectable]
         primary = selectable[0] if selectable else None

@@ -7,6 +7,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-15
+
+One answer, with its reasons, kept and shareable.
+
+### Added
+
+- Evidence fusion: the estimate is the best place inside the RTT region, ranked by the soft evidence
+  that agrees (GeoIP, RIPE IPmap, convergence and last located router, facilities); answers outside
+  the region are ruled out and listed as negative evidence. Confidence from the region size, the
+  number of independent agreeing sources and the network class (anycast, mobile, hosting, VPN lower
+  it); a plain-language explanation. Passive-only estimates stay at or below 38.
+- History: every finished run (window, terminal, bulk) is kept in `history.sqlite3`; diff of two
+  runs (estimate movement, confidence, network, GeoIP answers, convergence, first changed hop).
+- Export: JSON, GeoJSON, KML, Markdown report, CSV of traceroute hops, PNG of the map.
+- Bulk mode: a list of targets under one test budget, in the window (file mode, queue, pins coloured
+  by confidence) and with `wepwawet bulk`; summary CSV and GeoJSON.
+- `wepwawet locate --format/--output`, `wepwawet history list|show|diff|export`; API routes for
+  history, diff, export and bulk.
+- The desktop window allows downloads, for the exports.
+
 ## [0.4.0] - 2026-11-15
 
 Paths: Wepwawet now traces the routes to the address and reads the routers on the way.
@@ -109,7 +129,8 @@ First release: the application, without geolocation yet.
   supported distribution.
 - Documentation site in `docs/`.
 
-[Unreleased]: https://github.com/n36l3c7/Wepwawet/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/n36l3c7/Wepwawet/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/n36l3c7/Wepwawet/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/n36l3c7/Wepwawet/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/n36l3c7/Wepwawet/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/n36l3c7/Wepwawet/compare/v0.1.1...v0.2.0

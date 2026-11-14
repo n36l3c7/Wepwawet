@@ -24,11 +24,26 @@ from pydantic import BaseModel, Field
 from wepwawet import __version__
 from wepwawet.api.services import Services, default_services
 from wepwawet.config import LOOPBACK_HOSTS, Config
+from wepwawet.core.bulk import BulkJob, parse_targets
 from wepwawet.core.events import EventBus
+from wepwawet.core.export import FORMATS, render, summary_csv, target_features
+from wepwawet.core.history import diff_runs
+from wepwawet.core.models import RunReport
 
 
 class RunRequest(BaseModel):
     query: str = Field(min_length=1, max_length=300)
+
+
+class BulkRequest(BaseModel):
+    queries: list[str] = Field(min_length=1, max_length=1000)
+    max_tests: int = Field(default=500, ge=0, le=100_000)
+    passive: bool = False
+
+
+def _safe(text: str) -> str:
+    """A file-name-safe version of a query."""
+    return "".join(c if c.isalnum() or c in ".-" else "_" for c in text)[:60] or "run"
 
 
 SESSION_COOKIE = "wepwawet_session"
@@ -183,6 +198,90 @@ def create_app(
         if svc.runs.get(run_id) is None:
             raise HTTPException(status_code=404, detail="No such run")
         return {"cancelled": svc.runs.cancel(run_id)}
+
+    def _report(run_id: str) -> RunReport:
+        run = svc.runs.get(run_id)
+        if run is None:
+            raise HTTPException(status_code=404, detail="No such run")
+        return run
+
+    @app.get("/api/runs/{run_id}/export")
+    def export_run(run_id: str, format: str = Query("json")) -> Response:  # noqa: A002 - the query name
+        run = _report(run_id)
+        if format not in FORMATS:
+            raise HTTPException(status_code=400, detail=f"Unknown format; use one of {', '.join(FORMATS)}")
+        media, extension = FORMATS[format]
+        name = f"wepwawet-{_safe(run.query)}-{run.id}.{'hops.' if format == 'csv' else ''}{extension}"
+        return Response(
+            render(run, format), media_type=media, headers={"Content-Disposition": f'attachment; filename="{name}"'}
+        )
+
+    @app.get("/api/history")
+    def history(query: str | None = None, limit: int = Query(100, ge=1, le=1000)) -> list[dict[str, Any]]:
+        if svc.history is None:
+            return []
+        return [entry.as_dict() for entry in svc.history.list(query, limit)]
+
+    @app.get("/api/history/diff")
+    def history_diff(a: str, b: str, address: str | None = None) -> list[dict[str, str]]:
+        return [change.as_dict() for change in diff_runs(_report(a), _report(b), address)]
+
+    @app.delete("/api/history/{run_id}")
+    def history_delete(run_id: str) -> dict[str, bool]:
+        return {"deleted": bool(svc.history and svc.history.delete(run_id))}
+
+    @app.post("/api/bulk", status_code=202)
+    async def start_bulk(body: BulkRequest) -> dict[str, Any]:
+        try:
+            queries = parse_targets("\n".join(body.queries))
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        if not queries:
+            raise HTTPException(status_code=422, detail="No targets in the list")
+        try:
+            job = svc.start_bulk(queries, body.max_tests, body.passive)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return job.as_dict()
+
+    def _job(job_id: str) -> BulkJob:
+        job = svc.bulk_jobs.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="No such bulk run")
+        return job
+
+    @app.get("/api/bulk/{job_id}")
+    def get_bulk(job_id: str) -> dict[str, Any]:
+        return _job(job_id).as_dict()
+
+    @app.delete("/api/bulk/{job_id}")
+    def cancel_bulk(job_id: str) -> dict[str, bool]:
+        _job(job_id)
+        task = svc.bulk_tasks.get(job_id)
+        if task is None or task.done():
+            return {"cancelled": False}
+        task.cancel()
+        return {"cancelled": True}
+
+    @app.get("/api/bulk/{job_id}/export")
+    def export_bulk(job_id: str, format: str = Query("csv")) -> Response:  # noqa: A002 - the query name
+        job = _job(job_id)
+        if format == "csv":
+            body, media, extension = summary_csv(job.runs), "text/csv; charset=utf-8", "csv"
+        elif format == "geojson":
+            features = [
+                f
+                for run in job.runs
+                for t in run.targets
+                for f in target_features(t)
+                if f["properties"]["kind"] in ("estimate", "uncertainty")
+            ]
+            body = json.dumps({"type": "FeatureCollection", "features": features}, indent=1)
+            media, extension = "application/geo+json", "geojson"
+        else:
+            raise HTTPException(status_code=400, detail="Use format=csv or format=geojson")
+        name = f"wepwawet-bulk-{job.id}.{extension}"
+        return Response(body, media_type=media, headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
     @app.get("/api/events")
     async def events(request: Request) -> StreamingResponse:

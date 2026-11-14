@@ -104,5 +104,9 @@ def _run_in_window(webview: Any, url: str, smoke_test: threading.Event | None) -
 
         threading.Thread(target=watch, name="smoke-test", daemon=True).start()
 
+    # Exports (JSON, KML, PNG...) are downloads; pywebview blocks them unless allowed.
+    settings = getattr(webview, "settings", None)
+    if isinstance(settings, dict):
+        settings["ALLOW_DOWNLOADS"] = True
     webview.start(gui="qt", private_mode=True)
     return result["code"]

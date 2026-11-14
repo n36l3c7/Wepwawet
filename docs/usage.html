@@ -126,6 +126,52 @@
         (asymmetric return) or never reaches the target.
       </p>
 
+      <h2>The estimate</h2>
+      <p>At the end of a run every finding is weighed into one estimate:</p>
+      <ul>
+        <li>
+          The RTT region is a hard limit: the estimate is always inside it. A source that places the address outside it
+          (often a GeoIP database) is contradicted by physics, listed as <em>ruled out</em> and ignored.
+        </li>
+        <li>
+          Inside the region, the answers that agree with each other win: GeoIP databases, RIPE IPmap, the convergence
+          router and the last located router, each weighted by how much it is usually worth.
+        </li>
+        <li>
+          The confidence (0 to 100) starts from the size of the region, rises with independent sources agreeing, and
+          falls for anycast, mobile and hosting networks. Without measurements it never exceeds 38.
+        </li>
+      </ul>
+      <p>The Summary shows the estimate with its uncertainty and confidence, and the reasons in plain language.</p>
+
+      <h2>Export</h2>
+      <p>
+        <strong>Export</strong> in the Summary saves the run as JSON (the complete report), GeoJSON or KML (estimate,
+        uncertainty circle, region, evidence, probes, paths), a Markdown report, a CSV of every traceroute hop, or a PNG
+        of the map. From the terminal:
+      </p>
+      <pre><code>wepwawet locate ripe.net -f geojson -o ripe.geojson
+wepwawet history export RUN_ID -f md -o report.md</code></pre>
+
+      <h2>History</h2>
+      <p>
+        Every finished run is kept. The <strong>History</strong> tab lists the runs of the current target; click one to
+        open it, or tick two to see what changed: the estimate (and how far it moved), the confidence, the network, each
+        GeoIP answer, the convergence router and the first hop where a path differs. <strong>Re-run</strong> in the
+        Summary measures the same target again.
+      </p>
+      <pre><code>wepwawet history list ripe.net
+wepwawet history diff OLD_RUN NEW_RUN</code></pre>
+
+      <h2>Bulk</h2>
+      <p>
+        Switch the top bar to <strong>file</strong>, choose a text file with one target per line (<code>#</code> starts
+        a comment) and a test budget for the whole list, and press Run. Targets are located one after the other; each
+        may use what is left of the budget, and once it is spent the rest get the passive sources only. The panel shows
+        the queue, the map shows a pin per target coloured by confidence, and the summary exports as CSV or GeoJSON.
+      </p>
+      <pre><code>wepwawet bulk targets.txt --max-tests 500 -o results.csv</code></pre>
+
       <h2>Sources</h2>
       <div class="table-wrap">
         <table>
@@ -234,7 +280,7 @@ wepwawet serve            # server only; open the printed address yourself</code
       </p>
     </main>
     <footer class="site">
-      Wepwawet 0.4.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 0.5.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

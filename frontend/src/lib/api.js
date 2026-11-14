@@ -65,3 +65,23 @@ export const fetchProviders = (options) => getJson('/api/providers', options)
 export const fetchBudget = (options) => getJson('/api/budget', options)
 export const startRun = (query) => sendJson('POST', '/api/runs', { query })
 export const cancelRun = (id) => sendJson('DELETE', `/api/runs/${encodeURIComponent(id)}`)
+
+export const fetchRun = (id, options) => getJson(`/api/runs/${encodeURIComponent(id)}`, options)
+export const fetchHistory = (query, options) =>
+  getJson(`/api/history?limit=50${query ? `&query=${encodeURIComponent(query)}` : ''}`, options)
+export const fetchDiff = (a, b, options) =>
+  getJson(`/api/history/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`, options)
+export const startBulk = (queries, maxTests) => sendJson('POST', '/api/bulk', { queries, max_tests: maxTests })
+export const cancelBulk = (id) => sendJson('DELETE', `/api/bulk/${encodeURIComponent(id)}`)
+export const exportUrl = (runId, format) => `/api/runs/${encodeURIComponent(runId)}/export?format=${format}`
+export const bulkExportUrl = (jobId, format) => `/api/bulk/${encodeURIComponent(jobId)}/export?format=${format}`
+
+/** One target per line; # starts a comment; blank lines and duplicates are skipped (as the server does). */
+export function parseTargets(text) {
+  const seen = new Set()
+  for (const line of text.split(/\r?\n/)) {
+    const value = line.split('#', 1)[0].replace(/^[\s,;]+|[\s,;]+$/g, '')
+    if (value) seen.add(value)
+  }
+  return [...seen]
+}

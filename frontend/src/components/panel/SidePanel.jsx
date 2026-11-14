@@ -1,6 +1,50 @@
 import { useState } from 'react'
 import { PATH_COLORS, SOURCE_LABELS, groupEvidence, rttBand } from '../../lib/overlays.js'
 import AsciiJackal from '../ui/AsciiJackal.jsx'
+import { exportUrl } from '../../lib/api.js'
+import BulkPanel from './BulkPanel.jsx'
+import HistoryPanel from './HistoryPanel.jsx'
+
+const EXPORTS = [
+  ['json', 'JSON (full report)'],
+  ['geojson', 'GeoJSON'],
+  ['kml', 'KML (Google Earth)'],
+  ['md', 'Markdown report'],
+  ['csv', 'CSV of hops'],
+]
+
+function Actions({ run, onRerun, onSnapshot }) {
+  return (
+    <div className="flex flex-wrap gap-2 font-mono text-[11.5px]">
+      <details className="relative">
+        <summary className="cursor-pointer list-none border border-accent bg-accent px-2.5 py-1 font-bold text-accent-ink">
+          Export ▾
+        </summary>
+        <ul className="absolute left-0 z-20 mt-1 grid w-[200px] border border-line bg-sunken py-1 shadow-lg">
+          {EXPORTS.map(([format, label]) => (
+            <li key={format}>
+              <a href={exportUrl(run.id, format)} download className="block px-2.5 py-1 hover:bg-raised">
+                {label}
+              </a>
+            </li>
+          ))}
+          <li>
+            <button type="button" onClick={onSnapshot} className="block w-full px-2.5 py-1 text-left hover:bg-raised">
+              Map as PNG
+            </button>
+          </li>
+        </ul>
+      </details>
+      <button
+        type="button"
+        onClick={() => onRerun(run.query)}
+        className="border border-line bg-raised px-2.5 py-1 hover:border-accent"
+      >
+        Re-run
+      </button>
+    </div>
+  )
+}
 
 const TABS = [
   { id: 'summary', label: 'Summary' },
@@ -8,7 +52,7 @@ const TABS = [
   { id: 'hops', label: 'Hops' },
   { id: 'probes', label: 'Probes' },
   { id: 'raw', label: 'Raw' },
-  { id: 'history', label: 'History', from: '0.5.0', what: 'Past runs and their differences' },
+  { id: 'history', label: 'History' },
 ]
 
 const LIMITS = [
@@ -58,6 +102,7 @@ function Idle() {
           <li>Pings the target from about 50 probes worldwide, then about 30 near the fastest ones.</li>
           <li>Intersects the speed-of-light disks into a feasible region and detects anycast.</li>
           <li>Traces the paths from the fastest probes and reads router names for their cities.</li>
+          <li>Weighs everything into one estimate with a confidence and the reasons behind it.</li>
         </ul>
       </section>
       <section className="grid gap-2">
@@ -134,7 +179,7 @@ function EstimateCard({ report }) {
             'region',
             region ? `${Math.round(region.area_km2).toLocaleString('en')} km² · H3 res ${region.resolution}` : null,
           ],
-          ['probes', `${probes} answered of ${report.probes.length}`],
+          ['probes', report.probes.length ? `${probes} answered of ${report.probes.length}` : null],
         ]}
       />
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2" title="Confidence, 0 to 100">
@@ -366,7 +411,7 @@ function PathSummary({ report }) {
   )
 }
 
-function Summary({ report, running }) {
+function Summary({ report, running, run, onRerun, onSnapshot }) {
   const net = report.network ?? {}
   const located = report.evidence.filter((e) => e.point && e.source !== 'peeringdb')
   return (
@@ -388,6 +433,7 @@ function Summary({ report, running }) {
       ))}
       <Anycast anycast={report.anycast} />
       {report.estimate ? <EstimateCard report={report} /> : null}
+      {!running ? <Actions run={run} onRerun={onRerun} onSnapshot={onSnapshot} /> : null}
       <Candidates region={report.region} />
       <PathSummary report={report} />
       <section className="grid gap-2.5 border border-line bg-canvas p-3">
@@ -500,14 +546,42 @@ function Evidence({ report }) {
   ))
 }
 
-export default function SidePanel({ run, targetIndex, onTargetChange }) {
+export default function SidePanel({
+  run,
+  targetIndex,
+  onTargetChange,
+  onRerun,
+  onSnapshot,
+  onOpenRun,
+  bulk,
+  onCancelBulk,
+  onCloseBulk,
+}) {
   const [tab, setTab] = useState('summary')
   const current = TABS.find((t) => t.id === tab)
   const report = run?.targets?.[targetIndex] ?? null
   const running = run?.status === 'running'
 
   let body
-  if (current.from) {
+  if (bulk) {
+    return (
+      <aside className="flex min-h-0 min-w-0 flex-col border-l border-line bg-panel max-[860px]:border-l-0 max-[860px]:border-t">
+        <div className="border-b border-line bg-sunken px-3.5 py-2 font-mono text-[11.5px] text-accent-fg">
+          Bulk run · {bulk.items.length} targets
+        </div>
+        <div className="flex-1 overflow-auto p-3.5">
+          <BulkPanel job={bulk} onCancel={onCancelBulk} onOpen={onOpenRun} onClose={onCloseBulk} />
+        </div>
+      </aside>
+    )
+  }
+  if (tab === 'history') {
+    body = run ? (
+      <HistoryPanel query={run.query} currentId={run.id} onOpen={onOpenRun} />
+    ) : (
+      <HistoryPanel query={null} currentId={null} onOpen={onOpenRun} />
+    )
+  } else if (current.from) {
     body = (
       <p className="border border-dashed border-line px-1 py-6 text-center font-mono text-xs text-fg-subtle">
         {current.what} will appear here from v{current.from}.
@@ -532,7 +606,12 @@ export default function SidePanel({ run, targetIndex, onTargetChange }) {
   } else if (!report) {
     body = <Running run={run} />
   } else {
-    body = tab === 'summary' ? <Summary report={report} running={running} /> : <Evidence report={report} />
+    body =
+      tab === 'summary' ? (
+        <Summary report={report} running={running} run={run} onRerun={onRerun} onSnapshot={onSnapshot} />
+      ) : (
+        <Evidence report={report} />
+      )
   }
 
   return (

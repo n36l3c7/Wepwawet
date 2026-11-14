@@ -27,6 +27,27 @@
         Versions follow Semantic Versioning.
       </p>
 
+      <h2>0.5.0 · 2026-11-15</h2>
+      <p>One answer, with its reasons, kept and shareable.</p>
+      <h3>Added</h3>
+      <ul>
+        <li>
+          Evidence fusion: the estimate is the best place inside the RTT region ranked by the agreeing soft evidence;
+          answers outside the region are ruled out and listed; confidence from region size, agreement and network class;
+          plain-language explanation.
+        </li>
+        <li>
+          History of every run, with diff (estimate movement, confidence, network, GeoIP answers, convergence, first
+          changed hop) and re-run.
+        </li>
+        <li>Export: JSON, GeoJSON, KML, Markdown report, CSV of hops, PNG of the map.</li>
+        <li>
+          Bulk mode in the interface and with <code>wepwawet bulk</code>: a shared test budget, a queue, pins coloured
+          by confidence, CSV and GeoJSON summaries.
+        </li>
+        <li><code>wepwawet locate --format/--output</code>, <code>wepwawet history list|show|diff|export</code>.</li>
+      </ul>
+
       <h2>0.4.0 · 2026-11-15</h2>
       <p>Paths: Wepwawet now traces the routes to the address and reads the routers on the way.</p>
       <h3>Added</h3>
@@ -117,7 +138,7 @@
       <p>First release: the window, the map, the local server, the command line and the Linux packages.</p>
     </main>
     <footer class="site">
-      Wepwawet 0.4.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 0.5.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

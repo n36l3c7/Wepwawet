@@ -1,4 +1,5 @@
 import asyncio
+import time
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -187,10 +188,11 @@ def test_api_runs(app_paths: AppPaths, tmp_path: Path) -> None:
         started = client.post("/api/runs", json={"query": "193.0.14.129"})
         assert started.status_code == 202
         run_id = started.json()["id"]
-        for _ in range(50):
+        deadline = time.monotonic() + 10
+        body = client.get(f"/api/runs/{run_id}").json()
+        while body["status"] == "running" and time.monotonic() < deadline:
+            time.sleep(0.05)
             body = client.get(f"/api/runs/{run_id}").json()
-            if body["status"] != "running":
-                break
         assert body["status"] == "done"
         assert body["targets"][0]["network"]["asn"] == 64500
         assert client.get("/api/runs").json()[0]["id"] == run_id

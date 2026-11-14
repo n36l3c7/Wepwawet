@@ -8,6 +8,7 @@ from collections import OrderedDict
 from collections.abc import Callable
 
 from wepwawet.core.events import EventBus
+from wepwawet.core.history import History
 from wepwawet.core.models import RunReport, RunStatus
 from wepwawet.core.pipeline import Pipeline
 
@@ -19,19 +20,28 @@ PipelineFactory = Callable[[EventBus], Pipeline]
 class RunManager:
     """Keeps the most recent runs in memory and at most ``max_active`` running at once."""
 
-    def __init__(self, bus: EventBus, pipeline_factory: PipelineFactory, keep: int = 50, max_active: int = 1) -> None:
+    def __init__(
+        self,
+        bus: EventBus,
+        pipeline_factory: PipelineFactory,
+        keep: int = 50,
+        max_active: int = 1,
+        history: History | None = None,
+    ) -> None:
         self._bus = bus
         self._factory = pipeline_factory
         self._runs: OrderedDict[str, RunReport] = OrderedDict()
         self._tasks: dict[str, asyncio.Task[RunReport]] = {}
         self._keep = keep
         self._max_active = max_active
+        self.history = history
+        self.busy_elsewhere: Callable[[], bool] = lambda: False
 
     def active(self) -> list[str]:
         return [run_id for run_id, task in self._tasks.items() if not task.done()]
 
     def start(self, query: str) -> RunReport:
-        if len(self.active()) >= self._max_active:
+        if len(self.active()) >= self._max_active or self.busy_elsewhere():
             raise RuntimeError("Another run is in progress. Wait for it to finish or cancel it.")
         run = RunReport(id=secrets.token_hex(6), query=query.strip())
         self._runs[run.id] = run
@@ -44,6 +54,12 @@ class RunManager:
         return run
 
     def _finished(self, run_id: str, task: asyncio.Task[RunReport]) -> None:
+        run = self._runs.get(run_id)
+        if run is not None and self.history is not None and run.status is not RunStatus.RUNNING:
+            try:
+                self.history.save(run)
+            except Exception:  # the run itself succeeded; a full disk must not hide it
+                log.exception("Could not save run %s to the history", run_id)
         if task.cancelled():
             return
         error = task.exception()
@@ -55,7 +71,10 @@ class RunManager:
                 self._bus.publish("run", run.model_dump(mode="json"))
 
     def get(self, run_id: str) -> RunReport | None:
-        return self._runs.get(run_id)
+        run = self._runs.get(run_id)
+        if run is None and self.history is not None:
+            run = self.history.get(run_id)
+        return run
 
     def list(self) -> list[RunReport]:
         return list(reversed(self._runs.values()))

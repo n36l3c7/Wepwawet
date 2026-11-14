@@ -14,6 +14,7 @@ import {
   reportBounds,
 } from '../../lib/overlays.js'
 import AsciiJackal from '../ui/AsciiJackal.jsx'
+import { confidenceTone } from '../panel/BulkPanel.jsx'
 
 // The bundled build cannot find MapLibre's worker next to itself; point it to Vite's copy.
 setWorkerUrl(maplibreWorkerUrl)
@@ -211,7 +212,16 @@ function estimateElement(estimate) {
 
 const initialVisibility = () => Object.fromEntries(LAYERS.map((l) => [l.id, !l.initiallyOff]))
 
-export default function MapView({ basemap, cartoStyleUrl, report, points, onBasemapChange, onLog }) {
+export default function MapView({
+  basemap,
+  cartoStyleUrl,
+  report,
+  points,
+  bulkItems,
+  onBasemapChange,
+  onLog,
+  onSnapshotReady,
+}) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const dataRef = useRef({})
@@ -250,11 +260,50 @@ export default function MapView({ basemap, cartoStyleUrl, report, points, onBase
     })
     map.on('mouseleave', 'wpw-hops', () => popup.remove())
     mapRef.current = map
+    // A PNG of the map layers: the canvas is read inside the next render, before it is cleared.
+    onSnapshotReady?.(
+      () =>
+        new Promise((resolve) => {
+          map.once('render', () => map.getCanvas().toBlob(resolve, 'image/png'))
+          map.triggerRepaint()
+        }),
+    )
     return () => {
       map.remove()
       mapRef.current = null
     }
+    // The snapshot callback is registered once, with the map.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Bulk run: one pin per located target, coloured by confidence.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !bulkItems) return undefined
+    const located = bulkItems.filter((item) => item.summary?.lat !== undefined)
+    const markers = located.map((item) => {
+      const s = item.summary
+      const element = document.createElement('div')
+      element.className = 'wpw-pin'
+      element.style.setProperty('--pin', confidenceTone(s.confidence))
+      element.title = `${item.query} · ${s.city ?? ''} ${s.country ?? ''} · confidence ${s.confidence ?? '?'}`
+      element.setAttribute('role', 'img')
+      element.setAttribute('aria-label', element.title)
+      return new Marker({ element, anchor: 'bottom' }).setLngLat([s.lon, s.lat]).addTo(map)
+    })
+    if (located.length) {
+      const lons = located.map((i) => i.summary.lon)
+      const lats = located.map((i) => i.summary.lat)
+      map.fitBounds(
+        [
+          [Math.min(...lons) - 2, Math.max(-85, Math.min(...lats) - 2)],
+          [Math.max(...lons) + 2, Math.min(85, Math.max(...lats) + 2)],
+        ],
+        { padding: 60, maxZoom: 6, duration: 600 },
+      )
+    }
+    return () => markers.forEach((marker) => marker.remove())
+  }, [bulkItems])
 
   // Switch base map. Wait for the server settings before loading CARTO, or the offline map would flash first.
   useEffect(() => {

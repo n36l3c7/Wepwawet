@@ -1,7 +1,7 @@
 """The pipeline: resolve the input, then run every phase for every target, emitting progress events.
 
-Phases: passive enrichment (providers by stage), then the ping campaign with multilateration.
-Later versions add traceroutes and fusion after it.
+Phases: passive enrichment (providers by stage), the measurement campaign (pings, multilateration,
+traceroutes), then fusion of all the evidence into one estimate.
 """
 
 import asyncio
@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from wepwawet.core.campaign import Campaign
+from wepwawet.core.fusion import fuse
 from wepwawet.core.http import ProviderError
 from wepwawet.core.models import NetworkInfo, ProviderStatus, RunReport, RunStatus, TargetReport
 from wepwawet.core.targets import TargetError, resolve_input
@@ -79,6 +80,7 @@ class Pipeline:
                 await self._enrich(run, index, report)
                 if self._campaign is not None:
                     await self._measure(run, index, report, self._campaign)
+                self._finalise(run, index, report)
         except asyncio.CancelledError:
             run.status = RunStatus.CANCELLED
             run.finished_at = datetime.now(UTC)
@@ -109,6 +111,20 @@ class Pipeline:
                         report.caveats.append(caveat)
                 self._log(run, "info", provider.name, status.message or "ok")
             self._emit("target", {"run": run.id, "index": index, "report": report.model_dump(mode="json")})
+
+    def _finalise(self, run: RunReport, index: int, report: TargetReport) -> None:
+        """Fuse every piece of evidence into the final estimate."""
+        estimate = fuse(report)
+        if estimate is not None:
+            report.estimate = estimate
+            where = ", ".join(p for p in (estimate.city, estimate.country) if p) or "the region centre"
+            self._log(
+                run,
+                "ok",
+                "fusion",
+                f"{report.target.address}: {where} ±{estimate.uncertainty_km:.0f} km, confidence {estimate.confidence}",
+            )
+        self._emit("target", {"run": run.id, "index": index, "report": report.model_dump(mode="json")})
 
     async def _measure(self, run: RunReport, index: int, report: TargetReport, campaign: Campaign) -> None:
         def progress() -> None:

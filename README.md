@@ -10,9 +10,9 @@ Measurement-based IP geolocation for Linux: passive evidence plus ping and trace
 
 ![Wepwawet locating 193.0.6.139](docs/img/main-window.png)
 
-> **Status: v0.4.0.** Wepwawet reads every passive source about an address, pings it from about 80 probes,
-> intersects the speed-of-light limits into a feasible region, and traces the paths from the fastest probes
-> to read the routers on the way. Evidence fusion, history and export arrive in v0.5.0; see [Roadmap](#roadmap).
+> **Status: v0.5.0.** Passive sources, about 80 probes, a feasible region, traceroutes, and one fused
+> estimate with a confidence and its reasons; history with diff, export and bulk mode. v1.0.0 adds the
+> accuracy benchmark and hardening; see [Roadmap](#roadmap).
 
 ## What it does
 
@@ -52,17 +52,17 @@ Download the package for your distribution from the
 
 ```sh
 # Debian, Ubuntu, Kali
-sudo apt install ./wepwawet_0.4.0-1_amd64.deb
+sudo apt install ./wepwawet_0.5.0-1_amd64.deb
 
 # Fedora
-sudo dnf install ./wepwawet-0.4.0-1.x86_64.rpm
+sudo dnf install ./wepwawet-0.5.0-1.x86_64.rpm
 
 # Arch Linux
-sudo pacman -U wepwawet-0.4.0-1-x86_64.pkg.tar.zst
+sudo pacman -U wepwawet-0.5.0-1-x86_64.pkg.tar.zst
 
 # Any distribution: AppImage (needs libfuse2, or run it with --appimage-extract-and-run)
-chmod +x Wepwawet-0.4.0-x86_64.AppImage
-./Wepwawet-0.4.0-x86_64.AppImage
+chmod +x Wepwawet-0.5.0-x86_64.AppImage
+./Wepwawet-0.5.0-x86_64.AppImage
 ```
 
 The packages install the system libraries Qt needs and recommend `mtr` and `traceroute` for measurements
@@ -116,6 +116,18 @@ target estimates the access line (fibre, xDSL, mobile), most of which is removed
 the region is recomputed. Operator naming rules live in
 [`geohint_rules.toml`](src/wepwawet/data/geohint_rules.toml) and are easy to extend.
 
+## The estimate
+
+Every finding becomes weighted evidence. The RTT region is a hard limit; the answers that agree inside it
+(GeoIP databases, RIPE IPmap, the convergence router, the last located router) rank the places in it, and
+answers outside it are ruled out and listed. The result has an uncertainty radius, a confidence from 0 to
+100 (from the size of the region, independent sources agreeing, and the network class) and a plain-language
+explanation. Without measurements the confidence never exceeds 38.
+
+Every run is kept in a history: compare two runs to see whether the estimate moved, a GeoIP database
+changed its answer or a path changed. Runs export to JSON, GeoJSON, KML, Markdown, a CSV of hops, or a PNG
+of the map. Lists of targets run in bulk under one test budget.
+
 Answers are cached (one day by default). The network is classified as residential, mobile, hosting, CDN,
 VPN or education from cloud ranges, PeeringDB, the AS name and PTR patterns, and the window explains
 what that means for the answer.
@@ -126,7 +138,9 @@ what that means for the answer.
 |---|---|
 | `wepwawet` | Open the window. Same as `wepwawet gui`. |
 | `wepwawet gui --browser` | Open the interface in the system browser instead of a window, for machines where Qt WebEngine cannot run. |
-| `wepwawet locate TARGET [--json] [--passive]` | Locate an IP address or hostname and print the evidence (or the full JSON report); `--passive` skips the measurements. |
+| `wepwawet locate TARGET [-f FORMAT] [-o FILE] [--passive]` | Locate an IP address or hostname; print the evidence, or export it (`json`, `geojson`, `kml`, `md`, `csv`). |
+| `wepwawet history list\|show\|diff\|export` | Past runs: list them, show one, compare two, export one. |
+| `wepwawet bulk FILE [--max-tests N] [-o results.csv]` | Locate a list of targets under one test budget; print a summary CSV. |
 | `wepwawet providers` | List the sources and whether each can run now. |
 | `wepwawet data update [--only dbip\|ipinfo\|geolite\|geonames\|places]` | Download the GeoIP databases, the GeoNames cities and the place codes. `data status` lists the GeoIP databases. |
 | `wepwawet serve [--host H] [--port P]` | Start only the local server and print the address to open. |
@@ -222,7 +236,7 @@ requests at all.
 | 0.2.0 | Passive enrichment: GeoIP, RIPE IPmap, RIPEstat, RDAP, reverse DNS, PeeringDB, Shodan, Censys (done) |
 | 0.3.0 | Measurement providers, two-stage ping campaign, multilateration, anycast detection (done) |
 | 0.4.0 | Traceroutes, location hints from router names, IXPs, path convergence (done) |
-| 0.5.0 | Evidence fusion and confidence, history and diff, export, bulk mode |
+| 0.5.0 | Evidence fusion and confidence, history and diff, export, bulk mode (done) |
 | 1.0.0 | Accuracy benchmark, hardening, complete documentation |
 
 ## Development

@@ -13,6 +13,7 @@ from typing import Any
 from sqlalchemy import Column, Float, MetaData, String, Table, Text, create_engine, delete, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
+from sqlalchemy.pool import StaticPool
 
 _metadata = MetaData()
 _entries = Table(
@@ -40,7 +41,7 @@ class TTLCache:
 
     @classmethod
     def in_memory(cls, clock: Clock = time.time) -> "TTLCache":
-        return cls(create_engine("sqlite://"), clock)
+        return cls(create_engine("sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False}), clock)
 
     def get(self, source: str, key: str) -> Any | None:
         """Return the cached JSON value, or ``None`` when missing or expired."""

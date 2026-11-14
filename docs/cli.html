@@ -64,12 +64,85 @@
           </thead>
           <tbody>
             <tr>
+              <td><code>--format</code>, <code>-f</code></td>
+              <td>
+                <code>json</code>, <code>geojson</code>, <code>kml</code>, <code>md</code> or <code>csv</code> (hops)
+                instead of the table.
+              </td>
+            </tr>
+            <tr>
+              <td><code>--output</code>, <code>-o</code></td>
+              <td>Write the export to a file instead of standard output.</td>
+            </tr>
+            <tr>
               <td><code>--json</code></td>
-              <td>Print the full report as JSON (UTF-8, for scripts).</td>
+              <td>Same as <code>--format json</code>.</td>
             </tr>
             <tr>
               <td><code>--passive</code></td>
-              <td>Passive sources only: no ping campaign.</td>
+              <td>Passive sources only: no measurements.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Every run is saved to the history.</p>
+
+      <h2><code>wepwawet history</code></h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Command</th>
+              <th>Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>history list [QUERY] [--limit N]</code></td>
+              <td>Past runs, most recent first.</td>
+            </tr>
+            <tr>
+              <td><code>history show RUN</code></td>
+              <td>Print a past run.</td>
+            </tr>
+            <tr>
+              <td><code>history diff OLD NEW [--address IP]</code></td>
+              <td>What changed between two runs.</td>
+            </tr>
+            <tr>
+              <td><code>history export RUN -f FORMAT [-o FILE]</code></td>
+              <td>Export a past run.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2><code>wepwawet bulk FILE</code></h2>
+      <p>
+        Locate every target in <code>FILE</code> (one per line, <code>#</code> for comments, up to 1 000) one after the
+        other, and print a summary CSV: query, address, status, city, country, coordinates, uncertainty, confidence,
+        anycast, network class, ASN, error.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Option</th>
+              <th>Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>--max-tests N</code></td>
+              <td>Test budget for the whole list (default 500).</td>
+            </tr>
+            <tr>
+              <td><code>--passive</code></td>
+              <td>No measurements at all.</td>
+            </tr>
+            <tr>
+              <td><code>--output FILE</code></td>
+              <td>Write the summary CSV to a file.</td>
             </tr>
           </tbody>
         </table>
@@ -187,15 +260,49 @@
               <td>Cancel a running run</td>
             </tr>
             <tr>
+              <td><code>GET /api/runs/{id}/export?format=</code></td>
+              <td>
+                Download as <code>json</code>, <code>geojson</code>, <code>kml</code>, <code>md</code> or
+                <code>csv</code>
+              </td>
+            </tr>
+            <tr>
+              <td><code>GET /api/history?query=&amp;limit=</code></td>
+              <td>Past runs</td>
+            </tr>
+            <tr>
+              <td><code>GET /api/history/diff?a=&amp;b=</code></td>
+              <td>Changes between two runs</td>
+            </tr>
+            <tr>
+              <td><code>DELETE /api/history/{id}</code></td>
+              <td>Forget a run</td>
+            </tr>
+            <tr>
+              <td><code>POST /api/bulk</code></td>
+              <td>Body <code>{"queries": [...], "max_tests": 500, "passive": false}</code></td>
+            </tr>
+            <tr>
+              <td><code>GET /api/bulk/{id}</code>, <code>DELETE /api/bulk/{id}</code></td>
+              <td>Queue status; cancel</td>
+            </tr>
+            <tr>
+              <td><code>GET /api/bulk/{id}/export?format=csv|geojson</code></td>
+              <td>Summary of a bulk run</td>
+            </tr>
+            <tr>
               <td><code>GET /api/events</code></td>
-              <td>Server-sent events: <code>ready</code>, <code>run</code>, <code>target</code>, <code>log</code></td>
+              <td>
+                Server-sent events: <code>ready</code>, <code>run</code>, <code>target</code>, <code>bulk</code>,
+                <code>log</code>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
     </main>
     <footer class="site">
-      Wepwawet 0.4.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 0.5.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

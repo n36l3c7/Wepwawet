@@ -81,14 +81,18 @@ function BudgetMeter({ budget }) {
   )
 }
 
-export default function TopBar({ version, running, providers, budgets = [], error, onRun, onStop }) {
+export default function TopBar({ version, running, providers, budgets = [], error, onRun, onStop, onBulk }) {
   const [query, setQuery] = useState('')
+  const [mode, setMode] = useState('single')
+  const [file, setFile] = useState(null)
+  const [maxTests, setMaxTests] = useState(500)
   const mood = running ? 'animated' : error ? 'x' : 'open'
 
   const submit = (event) => {
     event.preventDefault()
     if (running) onStop()
-    else if (query.trim()) onRun(query.trim())
+    else if (mode === 'bulk' && file) onBulk(file, maxTests)
+    else if (mode === 'single' && query.trim()) onRun(query.trim())
   }
 
   return (
@@ -105,25 +109,70 @@ export default function TopBar({ version, running, providers, budgets = [], erro
             error ? 'border-high' : 'border-line focus-within:border-accent',
           ].join(' ')}
         >
-          <span className="flex items-center pl-2.5 pr-1 font-mono text-accent" aria-hidden="true">
-            ❯
-          </span>
-          <input
-            id="target"
-            name="target"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            disabled={running}
-            autoComplete="off"
-            spellCheck="false"
-            aria-invalid={Boolean(error)}
-            aria-describedby={error ? 'target-error' : undefined}
-            placeholder="IP address or hostname, e.g. one.one.one.one"
-            className="min-w-0 flex-1 bg-transparent px-1.5 py-1.5 font-mono text-[13px] outline-none placeholder:text-fg-subtle disabled:text-fg-muted"
-          />
+          <div className="flex border-r border-line font-mono text-[11.5px]" role="group" aria-label="Mode">
+            {[
+              ['single', 'ip/host'],
+              ['bulk', 'file'],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={mode === key}
+                disabled={running}
+                onClick={() => setMode(key)}
+                className={mode === key ? 'bg-accent-soft px-2.5 text-accent-fg' : 'px-2.5 text-fg-subtle'}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {mode === 'bulk' ? (
+            <div className="flex min-w-0 flex-1 items-center gap-2 px-2 font-mono text-[12px]">
+              <input
+                id="bulk-file"
+                type="file"
+                accept=".txt,.csv,.list,text/plain"
+                aria-label="File with one target per line"
+                disabled={running}
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                className="min-w-0 flex-1 text-fg-muted file:mr-2 file:border file:border-line file:bg-raised file:px-2 file:py-0.5 file:font-mono file:text-fg"
+              />
+              <label htmlFor="bulk-tests" className="whitespace-nowrap text-fg-subtle">
+                tests
+              </label>
+              <input
+                id="bulk-tests"
+                type="number"
+                min="0"
+                step="10"
+                value={maxTests}
+                onChange={(event) => setMaxTests(Number(event.target.value))}
+                className="w-[72px] border border-line bg-canvas px-1.5 py-0.5 tabular-nums"
+              />
+            </div>
+          ) : (
+            <>
+              <span className="flex items-center pl-2.5 pr-1 font-mono text-accent" aria-hidden="true">
+                ❯
+              </span>
+              <input
+                id="target"
+                name="target"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                disabled={running}
+                autoComplete="off"
+                spellCheck="false"
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? 'target-error' : undefined}
+                placeholder="IP address or hostname, e.g. one.one.one.one"
+                className="min-w-0 flex-1 bg-transparent px-1.5 py-1.5 font-mono text-[13px] outline-none placeholder:text-fg-subtle disabled:text-fg-muted"
+              />
+            </>
+          )}
           <button
             type="submit"
-            disabled={!running && !query.trim()}
+            disabled={!running && (mode === 'bulk' ? !file : !query.trim())}
             className={[
               'px-4 font-mono text-[12px] font-bold tracking-wider disabled:cursor-not-allowed disabled:opacity-40',
               running ? 'bg-high-soft text-high' : 'bg-accent text-accent-ink',

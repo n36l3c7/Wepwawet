@@ -246,3 +246,12 @@ body {
     0 0 3px var(--color-sunken),
     0 0 3px var(--color-sunken);
 }
+
+/* Bulk run pins, coloured by confidence through --pin */
+.wpw-pin {
+  width: 14px;
+  height: 20px;
+  background: var(--pin, var(--color-accent));
+  clip-path: path('M7 20 L1.5 10 A6.5 6.5 0 1 1 12.5 10 Z');
+  filter: drop-shadow(0 0 1px var(--color-sunken));
+}
