@@ -1,0 +1,117 @@
+@import 'tailwindcss';
+@import 'maplibre-gl/dist/maplibre-gl.css';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/700.css';
+
+/*
+ * ============================================================================
+ * WEPWAWET DESIGN TOKENS — "Sand & turquoise", terminal look, dark only
+ * ============================================================================
+ * Desert gold for the accent, Nile turquoise for secondary data. Components use
+ * the names (bg-panel, text-fg-muted, border-line, text-accent…), and the map
+ * reads the same variables at runtime, so the palette lives here only.
+ * `static` emits every variable, also those no utility class uses (the map's).
+ */
+@theme static {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'DejaVu Sans Mono', monospace;
+
+  /* Surfaces, darkest to lightest (warm neutrals biased toward the gold) */
+  --color-sunken: #0a0907; /* title bar, log, map controls */
+  --color-canvas: #100e0a; /* page background */
+  --color-panel: #17140e; /* side panel, inputs */
+  --color-raised: #211d14; /* hover */
+  --color-line: #3a3324; /* borders */
+  --color-line-soft: #262117; /* table row dividers */
+
+  /* Text */
+  --color-fg: #eee7d5;
+  --color-fg-muted: #aca38c; /* secondary text, 7:1 on canvas */
+  --color-fg-subtle: #716952; /* decoration and disabled only */
+
+  /* Accent: desert gold */
+  --color-accent: #e3b341;
+  --color-accent-fg: #f5d47a;
+  --color-accent-soft: #3a2c0c;
+  --color-accent-ink: #1a1305; /* text on a gold background */
+
+  /* Secondary: Nile turquoise */
+  --color-accent2: #3cc7bd;
+  --color-accent2-soft: #0e2e2b;
+
+  /* Map */
+  --color-ocean: #0b0a07;
+  --color-land: #1b1811;
+  --color-land-hi: #232017;
+  --color-border: #3d3626;
+
+  /* RTT ramp, near (bright) to far (dark) */
+  --color-rtt1: #fff1b8;
+  --color-rtt2: #f2c94c;
+  --color-rtt3: #d08a2e;
+  --color-rtt4: #8a5a2b;
+  --color-rtt5: #4d3a24;
+
+  /* Semantic, identical in every palette */
+  --color-good: #56d364;
+  --color-warn: #f0883e;
+  --color-high: #ff7b72;
+  --color-high-soft: #3d1418;
+  --color-info: #79c0ff;
+  --color-info-soft: #0c2440;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color-scheme: dark;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* MapLibre controls in the terminal look */
+.maplibregl-ctrl-attrib,
+.maplibregl-ctrl-attrib.maplibregl-compact {
+  background: color-mix(in srgb, var(--color-sunken) 85%, transparent) !important;
+  color: var(--color-fg-subtle);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--color-fg-muted);
+}
+.maplibregl-ctrl-group {
+  background: var(--color-sunken) !important;
+  border: 1px solid var(--color-line);
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.maplibregl-ctrl-group button + button {
+  border-top-color: var(--color-line) !important;
+}
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(0.85) sepia(0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

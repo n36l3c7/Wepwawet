@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Wepwawet">
+  <rect width="160" height="160" rx="28" fill="#100e0a"/>
+  <g transform="translate(14 28) scale(1)">
+    <clipPath id="neck"><polygon points="30,62 60,74 72,104 22,104"/></clipPath>
+    <polygon points="30,44 37,2 53,38" fill="#e3b341"/>
+    <polygon points="47,40 60,0 69,44" fill="#e3b341"/>
+    <polygon points="53,38 60,10 64.5,40" fill="#3a2c0c"/>
+    <ellipse cx="48" cy="55" rx="23" ry="19" fill="#e3b341"/>
+    <polygon points="60,41 90,49 112,56 125,60 129,64.5 125,69 104,72 80,77 62,79" fill="#e3b341"/>
+    <polygon points="30,62 60,74 72,104 22,104" fill="#e3b341"/>
+    <g clip-path="url(#neck)">
+      <rect x="0" y="84" width="100" height="5" fill="#3cc7bd"/>
+      <rect x="0" y="92" width="100" height="5" fill="#3cc7bd"/>
+      <rect x="0" y="100" width="100" height="4" fill="#3cc7bd"/>
+    </g>
+    <path d="M67 50 Q74 45 81 50 Q74 54 67 50 Z" fill="#100e0a"/>
+    <circle cx="74.5" cy="50" r="2" fill="#3cc7bd"/>
+    <circle cx="126" cy="64.5" r="3.2" fill="#100e0a"/>
+    <path d="M90 70.5 L120 67.5" stroke="#100e0a" stroke-width="1.6" stroke-linecap="round"/>
+  </g>
+</svg>

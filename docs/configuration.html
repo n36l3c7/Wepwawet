@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Configuration · Wepwawet</title>
+    <meta name="description" content="Wepwawet: measurement-based IP geolocation for Linux." />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site">
+      <a class="brand" href="index.html"><span aria-hidden="true">/\o&gt;</span>wepwawet</a>
+      <nav aria-label="Documentation">
+        <a href="index.html">Overview</a>
+        <a href="installation.html">Installation</a>
+        <a href="usage.html">Usage</a>
+        <a href="configuration.html" aria-current="page">Configuration</a>
+        <a href="cli.html">CLI reference</a>
+        <a href="changelog.html">Changelog</a>
+      </nav>
+    </header>
+    <main>
+      <h1>Configuration</h1>
+      <p class="lede">
+        Wepwawet works without configuration. Settings come from defaults, then the configuration file, then environment
+        variables.
+      </p>
+
+      <h2>Configuration file</h2>
+      <p>Create <code>~/.config/wepwawet/config.toml</code> with the settings you want to change:</p>
+      <pre><code>[server]
+host = "127.0.0.1"   # loopback only, unless allow_remote = true
+port = 0             # 0 picks a free port at start-up
+allow_remote = false
+
+[map]
+basemap = "carto"    # "carto" or "offline"
+
+[cache]
+default_ttl_seconds = 86400
+ttl_seconds = { rdap = 604800 }   # per-source overrides
+
+[logging]
+level = "INFO"       # DEBUG, INFO, WARNING, ERROR</code></pre>
+      <p>
+        An unknown key or an invalid value stops Wepwawet with a message naming the key, so a typo never goes unnoticed.
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th>Default</th>
+              <th>Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>server.host</code></td>
+              <td><code>127.0.0.1</code></td>
+              <td>Address of the local server.</td>
+            </tr>
+            <tr>
+              <td><code>server.port</code></td>
+              <td><code>0</code></td>
+              <td>Port; <code>0</code> picks a free one.</td>
+            </tr>
+            <tr>
+              <td><code>server.allow_remote</code></td>
+              <td><code>false</code></td>
+              <td>
+                Allow a non-loopback <code>host</code> and any <code>Host</code> header. Only for a trusted network.
+              </td>
+            </tr>
+            <tr>
+              <td><code>map.basemap</code></td>
+              <td><code>carto</code></td>
+              <td>Base map shown at start-up: <code>carto</code> or <code>offline</code>.</td>
+            </tr>
+            <tr>
+              <td><code>cache.default_ttl_seconds</code></td>
+              <td><code>86400</code></td>
+              <td>How long provider answers stay cached.</td>
+            </tr>
+            <tr>
+              <td><code>cache.ttl_seconds</code></td>
+              <td><code>{}</code></td>
+              <td>Cache time per source, overriding the default.</td>
+            </tr>
+            <tr>
+              <td><code>logging.level</code></td>
+              <td><code>INFO</code></td>
+              <td>Log level for the terminal and the log file.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>Environment variables</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Variable</th>
+              <th>Overrides</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>WEPWAWET_CONFIG</code></td>
+              <td>Path of the configuration file (must exist).</td>
+            </tr>
+            <tr>
+              <td><code>WEPWAWET_HOST</code>, <code>WEPWAWET_PORT</code></td>
+              <td><code>server.host</code>, <code>server.port</code></td>
+            </tr>
+            <tr>
+              <td><code>WEPWAWET_BASEMAP</code></td>
+              <td><code>map.basemap</code></td>
+            </tr>
+            <tr>
+              <td><code>WEPWAWET_LOG_LEVEL</code></td>
+              <td><code>logging.level</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>Files</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Path</th>
+              <th>Content</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>~/.config/wepwawet/</code></td>
+              <td>Configuration (<code>$XDG_CONFIG_HOME</code>)</td>
+            </tr>
+            <tr>
+              <td><code>~/.local/share/wepwawet/</code></td>
+              <td>Log file, history from v0.5.0 (<code>$XDG_DATA_HOME</code>)</td>
+            </tr>
+            <tr>
+              <td><code>~/.cache/wepwawet/</code></td>
+              <td>Cache of provider answers; safe to delete (<code>$XDG_CACHE_HOME</code>)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The directories are created readable by you only. Tokens and API keys are replaced with <code>***</code> in
+        every log line.
+      </p>
+    </main>
+    <footer class="site">
+      Wepwawet 0.1.0 · MIT licence ·
+      <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+    </footer>
+  </body>
+</html>

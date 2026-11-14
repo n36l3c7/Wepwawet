@@ -1,0 +1,4 @@
+#!/bin/sh
+# AppImage entry point: the same launcher, relative to the mounted image.
+HERE="$(dirname "$(readlink -f "$0")")"
+exec "$HERE/opt/wepwawet/python/bin/python3" -I -m wepwawet "$@"

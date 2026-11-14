@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Wepwawet
+GenericName=IP Geolocation
+Comment=Locate an IP address with passive evidence and network measurements
+Exec=wepwawet
+Icon=wepwawet
+Terminal=false
+Categories=Network;Utility;
+Keywords=ip;geolocation;traceroute;ping;network;osint;
+StartupWMClass=Wepwawet

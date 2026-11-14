@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Usage · Wepwawet</title>
+    <meta name="description" content="Wepwawet: measurement-based IP geolocation for Linux." />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site">
+      <a class="brand" href="index.html"><span aria-hidden="true">/\o&gt;</span>wepwawet</a>
+      <nav aria-label="Documentation">
+        <a href="index.html">Overview</a>
+        <a href="installation.html">Installation</a>
+        <a href="usage.html" aria-current="page">Usage</a>
+        <a href="configuration.html">Configuration</a>
+        <a href="cli.html">CLI reference</a>
+        <a href="changelog.html">Changelog</a>
+      </nav>
+    </header>
+    <main>
+      <h1>Usage</h1>
+      <p class="lede">Open Wepwawet from the desktop menu, or type <code>wepwawet</code> in a terminal.</p>
+
+      <h2>The window</h2>
+      <img
+        src="img/main-window.png"
+        alt="The Wepwawet window with its map, side panel and log."
+        width="1416"
+        height="808"
+      />
+      <ul>
+        <li>
+          <strong>Top bar</strong>: the target (an IP address or a hostname) and the Run button. Locating targets
+          arrives in v0.2.0.
+        </li>
+        <li>
+          <strong>Map</strong>: drag to move, scroll or use + and − to zoom. The coordinates under the pointer are in
+          the bottom-left corner.
+        </li>
+        <li>
+          <strong>Side panel</strong>: Summary, Evidence, Hops, Probes, Raw and History tabs. In v0.1.0 only Summary has
+          content.
+        </li>
+        <li><strong>Log</strong>: live messages from the local server. "live · sse" means the window is connected.</li>
+      </ul>
+
+      <h2>Base maps</h2>
+      <p>The buttons in the top-right corner of the map switch between:</p>
+      <ul>
+        <li>
+          <strong>CARTO dark</strong> (default): street-level vector tiles from CARTO, built from OpenStreetMap data and
+          recoloured to match the interface. Needs the network and follows CARTO's terms.
+        </li>
+        <li>
+          <strong>Vector · offline</strong>: country outlines from Natural Earth, bundled with the application. No
+          network request at all.
+        </li>
+      </ul>
+      <p>If CARTO cannot be reached, Wepwawet switches to the offline map and says so in the log.</p>
+
+      <h2>When the window cannot open</h2>
+      <p>
+        Qt WebEngine needs a graphical session and a working OpenGL stack. If the window fails (for example over SSH or
+        in some virtual machines):
+      </p>
+      <pre><code>wepwawet gui --browser    # same interface, in the system browser
+wepwawet serve            # server only; open the printed address yourself</code></pre>
+      <p>If the map shows "The map cannot start", the display has no working WebGL: use <code>--browser</code>.</p>
+
+      <h2>The jackal</h2>
+      <p>
+        The ASCII jackal shows what Wepwawet is doing: asleep when there is nothing to do, sniffing and looking around
+        while it measures, with a crossed eye on errors, and pleased when it has an answer. With "reduce motion" enabled
+        in your desktop settings it stays still.
+      </p>
+    </main>
+    <footer class="site">
+      Wepwawet 0.1.0 · MIT licence ·
+      <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+    </footer>
+  </body>
+</html>

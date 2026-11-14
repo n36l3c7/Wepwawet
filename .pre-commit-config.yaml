@@ -1,0 +1,33 @@
+# Install once with: uv run pre-commit install
+# Hooks run the project's own pinned tools, so they match CI exactly.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --force-exclude
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format --force-exclude
+        language: system
+        types_or: [python, pyi]
+      - id: mypy
+        name: mypy
+        entry: uv run mypy
+        language: system
+        pass_filenames: false
+        types: [python]
+      - id: eslint
+        name: eslint (frontend)
+        entry: bash -c 'cd frontend && npx eslint .'
+        language: system
+        pass_filenames: false
+        files: ^frontend/
+      - id: prettier
+        name: prettier (frontend, docs, CI)
+        entry: bash -c 'cd frontend && npx prettier --check . ../docs ../.github'
+        language: system
+        pass_filenames: false
+        files: ^(frontend|docs|\.github)/

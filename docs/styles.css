@@ -1,0 +1,235 @@
+/* Wepwawet documentation site: one stylesheet, no external assets.
+   The look follows the application: dark, monospace, hard edges, desert gold and Nile turquoise. */
+
+:root {
+  --sunken: #0a0907;
+  --canvas: #100e0a;
+  --panel: #17140e;
+  --line: #3a3324;
+  --line-soft: #262117;
+  --fg: #eee7d5;
+  --fg-muted: #aca38c;
+  --fg-subtle: #716952;
+  --accent: #e3b341;
+  --accent-fg: #f5d47a;
+  --accent-soft: #3a2c0c;
+  --accent2: #3cc7bd;
+  --high: #ff7b72;
+  --mono: 'JetBrains Mono', ui-monospace, 'DejaVu Sans Mono', 'Liberation Mono', monospace;
+  --sans: Inter, ui-sans-serif, system-ui, 'DejaVu Sans', sans-serif;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--canvas);
+  color: var(--fg);
+  font: 15px/1.65 var(--sans);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+a {
+  color: var(--accent2);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+header.site {
+  background: var(--sunken);
+  border-bottom: 1px solid var(--line);
+  padding: 0.7rem max(16px, 4vw);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6rem 2rem;
+  font-family: var(--mono);
+}
+
+header.site .brand {
+  color: var(--fg);
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+header.site .brand span {
+  color: var(--accent);
+  margin-right: 0.5ch;
+}
+
+header.site nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 1.2rem;
+  font-size: 0.85rem;
+}
+
+header.site nav a {
+  color: var(--fg-muted);
+}
+
+header.site nav a[aria-current='page'] {
+  color: var(--accent-fg);
+  border-bottom: 2px solid var(--accent);
+}
+
+main {
+  flex: 1;
+  width: 100%;
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 2rem max(16px, 4vw) 3rem;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--mono);
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: 1.7rem;
+  color: var(--accent-fg);
+  margin: 0 0 0.6rem;
+}
+
+h2 {
+  font-size: 1.15rem;
+  margin: 2.4rem 0 0.6rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--line);
+}
+
+h3 {
+  font-size: 1rem;
+  margin: 1.6rem 0 0.4rem;
+  color: var(--accent2);
+}
+
+p,
+li {
+  max-width: 68ch;
+}
+
+.lede {
+  color: var(--fg-muted);
+  font-size: 1.05rem;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--mono);
+  font-size: 0.88em;
+}
+
+code {
+  background: var(--panel);
+  border: 1px solid var(--line-soft);
+  padding: 0 0.3em;
+}
+
+pre {
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  padding: 0.9rem 1rem;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+
+pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9rem;
+}
+
+th,
+td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+th {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-subtle);
+  border-bottom-color: var(--line);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+}
+
+.note {
+  border-left: 2px solid var(--accent);
+  background: var(--accent-soft);
+  padding: 0.6rem 0.9rem;
+  margin: 1.2rem 0;
+}
+
+.warn {
+  border-left: 2px solid var(--high);
+  background: #3d1418;
+  padding: 0.6rem 0.9rem;
+  margin: 1.2rem 0;
+}
+
+.jackal {
+  font-family: var(--mono);
+  color: var(--accent);
+  font-size: 9px;
+  line-height: 1;
+  border: 0;
+  background: none;
+  padding: 0;
+  margin: 0 0 1rem;
+}
+
+.jackal .t {
+  color: var(--accent2);
+}
+
+footer.site {
+  border-top: 1px solid var(--line);
+  background: var(--sunken);
+  color: var(--fg-subtle);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  padding: 0.9rem max(16px, 4vw);
+}

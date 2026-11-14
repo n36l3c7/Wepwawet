@@ -1,0 +1,135 @@
+# nfpm configuration: one staged tree, three package formats.
+# build.sh replaces ${VERSION}, ${PKG_ARCH} (amd64 | arm64) and ${STAGE} (staged root) before running nfpm.
+name: wepwawet
+arch: ${PKG_ARCH}
+platform: linux
+version: ${VERSION}
+release: 1
+section: net
+priority: optional
+maintainer: n36l3c7 <n36l3c7@users.noreply.github.com>
+vendor: n36l3c7
+homepage: https://github.com/n36l3c7/Wepwawet
+license: MIT
+description: |-
+  Measurement-based IP geolocation.
+  Wepwawet estimates where an IP address is by combining passive evidence
+  (GeoIP databases, RIR data, reverse DNS, PeeringDB) with ping and traceroute
+  from many vantage points, and shows the evidence on a map.
+
+contents:
+  - src: ${STAGE}/opt/wepwawet
+    dst: /opt/wepwawet
+    type: tree
+  - src: ${STAGE}/usr/bin/wepwawet
+    dst: /usr/bin/wepwawet
+    file_info:
+      mode: 0755
+  - src: /usr/bin/wepwawet
+    dst: /usr/bin/wpw
+    type: symlink
+  - src: ${STAGE}/usr/share/applications/wepwawet.desktop
+    dst: /usr/share/applications/wepwawet.desktop
+  - src: ${STAGE}/usr/share/icons/hicolor/scalable/apps/wepwawet.svg
+    dst: /usr/share/icons/hicolor/scalable/apps/wepwawet.svg
+  - src: ${STAGE}/usr/share/licenses/wepwawet/LICENSE
+    dst: /usr/share/licenses/wepwawet/LICENSE
+    packager: rpm
+  - src: ${STAGE}/usr/share/licenses/wepwawet/LICENSE
+    dst: /usr/share/licenses/wepwawet/LICENSE
+    packager: archlinux
+  - src: ${STAGE}/usr/share/licenses/wepwawet/LICENSE
+    dst: /usr/share/doc/wepwawet/copyright
+    packager: deb
+
+# System libraries that Qt WebEngine (PySide6) loads at run time; Python and Qt themselves are bundled.
+overrides:
+  deb:
+    depends:
+      - libgl1
+      - libegl1
+      - libfontconfig1
+      - libdbus-1-3
+      - libxkbcommon0
+      - libxkbcommon-x11-0
+      - libxcb-cursor0
+      - libxcb-icccm4
+      - libxcb-image0
+      - libxcb-keysyms1
+      - libxcb-randr0
+      - libxcb-render-util0
+      - libxcb-shape0
+      - libxcb-xinerama0
+      - libxcb-xkb1
+      - libx11-xcb1
+      - libnss3
+      - libxcomposite1
+      - libxdamage1
+      - libxrandr2
+      - libxtst6
+      - libxkbfile1
+      - libxfixes3
+      - libglib2.0-0t64 | libglib2.0-0
+      - libgssapi-krb5-2
+      - libasound2t64 | libasound2
+    recommends:
+      - mtr-tiny | mtr
+      - traceroute
+  rpm:
+    depends:
+      - libglvnd-glx
+      - libglvnd-egl
+      - fontconfig
+      - dbus-libs
+      - libxkbcommon
+      - libxkbcommon-x11
+      - xcb-util-cursor
+      - xcb-util-wm
+      - xcb-util-image
+      - xcb-util-keysyms
+      - xcb-util-renderutil
+      - nss
+      - libXcomposite
+      - libXdamage
+      - libXrandr
+      - libXtst
+      - libxkbfile
+      - libXfixes
+      - glib2
+      - krb5-libs
+      - alsa-lib
+    recommends:
+      - mtr
+      - traceroute
+  archlinux:
+    depends:
+      - libglvnd
+      - fontconfig
+      - dbus
+      - libxkbcommon
+      - libxkbcommon-x11
+      - xcb-util-cursor
+      - xcb-util-wm
+      - xcb-util-image
+      - xcb-util-keysyms
+      - xcb-util-renderutil
+      - nss
+      - libxcomposite
+      - libxdamage
+      - libxrandr
+      - libxtst
+      - libxkbfile
+      - libxfixes
+      - glib2
+      - krb5
+      - alsa-lib
+      # Arch's fontconfig installs no font; Chromium's renderer aborts without any system font.
+      - ttf-font
+
+rpm:
+  summary: Measurement-based IP geolocation
+  group: Applications/Internet
+  compression: zstd
+
+deb:
+  compression: zstd

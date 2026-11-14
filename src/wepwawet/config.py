@@ -1,0 +1,127 @@
+"""Configuration: defaults, overridden by ``config.toml``, overridden by environment variables.
+
+Environment variables:
+
+- ``WEPWAWET_CONFIG``: path of the TOML file (default: ``$XDG_CONFIG_HOME/wepwawet/config.toml``).
+- ``WEPWAWET_HOST`` / ``WEPWAWET_PORT``: address of the local server.
+- ``WEPWAWET_LOG_LEVEL``: ``DEBUG``, ``INFO``, ``WARNING`` or ``ERROR``.
+- ``WEPWAWET_BASEMAP``: ``carto`` or ``offline``.
+"""
+
+import os
+import tomllib
+from pathlib import Path
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+
+from wepwawet.paths import AppPaths, default_paths
+
+LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
+
+
+class ConfigError(Exception):
+    """The configuration file or an environment variable holds an invalid value."""
+
+
+class _Section(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class ServerConfig(_Section):
+    host: str = "127.0.0.1"
+    # 0 picks a free port at start-up.
+    port: int = Field(default=0, ge=0, le=65535)
+    # Binding outside loopback is refused unless this is set explicitly.
+    allow_remote: bool = False
+
+
+class MapConfig(_Section):
+    basemap: Literal["carto", "offline"] = "carto"
+
+
+class CacheConfig(_Section):
+    default_ttl_seconds: int = Field(default=86_400, gt=0)
+    # Per-source overrides, e.g. {"rdap" = 604800}.
+    ttl_seconds: dict[str, int] = Field(default_factory=dict)
+
+    @field_validator("ttl_seconds")
+    @classmethod
+    def _positive(cls, value: dict[str, int]) -> dict[str, int]:
+        bad = [name for name, ttl in value.items() if ttl <= 0]
+        if bad:
+            raise ValueError(f"TTL must be positive for: {', '.join(sorted(bad))}")
+        return value
+
+    def ttl_for(self, source: str) -> int:
+        return self.ttl_seconds.get(source, self.default_ttl_seconds)
+
+
+class LoggingConfig(_Section):
+    level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+
+
+class Config(_Section):
+    server: ServerConfig = Field(default_factory=ServerConfig)
+    map: MapConfig = Field(default_factory=MapConfig)
+    cache: CacheConfig = Field(default_factory=CacheConfig)
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)
+
+    def check_bind_address(self) -> None:
+        if self.server.host not in LOOPBACK_HOSTS and not self.server.allow_remote:
+            raise ConfigError(
+                f"Refusing to listen on {self.server.host}: only loopback addresses are allowed. "
+                "Set server.allow_remote = true in config.toml to override."
+            )
+
+
+def _env_overrides(environ: dict[str, str]) -> dict[str, Any]:
+    overrides: dict[str, dict[str, Any]] = {}
+    mapping = {
+        "WEPWAWET_HOST": ("server", "host"),
+        "WEPWAWET_PORT": ("server", "port"),
+        "WEPWAWET_LOG_LEVEL": ("logging", "level"),
+        "WEPWAWET_BASEMAP": ("map", "basemap"),
+    }
+    for variable, (section, key) in mapping.items():
+        if variable in environ:
+            value = environ[variable].strip()
+            overrides.setdefault(section, {})[key] = value.upper() if key == "level" else value
+    return overrides
+
+
+def _merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def config_file_path(paths: AppPaths, environ: dict[str, str]) -> Path:
+    explicit = environ.get("WEPWAWET_CONFIG", "").strip()
+    return Path(explicit) if explicit else paths.config_file
+
+
+def load_config(paths: AppPaths | None = None, environ: dict[str, str] | None = None) -> Config:
+    """Load the configuration. A missing file means defaults; an invalid one raises ``ConfigError``."""
+    paths = paths or default_paths()
+    environ = dict(os.environ) if environ is None else environ
+    path = config_file_path(paths, environ)
+
+    data: dict[str, Any] = {}
+    if path.is_file():
+        try:
+            data = tomllib.loads(path.read_text(encoding="utf-8"))
+        except (tomllib.TOMLDecodeError, UnicodeDecodeError) as exc:
+            raise ConfigError(f"{path} is not valid TOML: {exc}") from exc
+    elif "WEPWAWET_CONFIG" in environ:
+        raise ConfigError(f"WEPWAWET_CONFIG points to {path}, which does not exist.")
+
+    try:
+        return Config.model_validate(_merge(data, _env_overrides(environ)))
+    except ValidationError as exc:
+        details = "; ".join(f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}" for err in exc.errors())
+        raise ConfigError(f"Invalid configuration ({path}): {details}") from exc

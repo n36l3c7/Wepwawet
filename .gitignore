@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build output
+build/
+dist/
+*.AppImage
+src/wepwawet/web/dist/
+
+# Frontend
+node_modules/
+frontend/dist/

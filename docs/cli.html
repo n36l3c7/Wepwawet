@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CLI reference · Wepwawet</title>
+    <meta name="description" content="Wepwawet: measurement-based IP geolocation for Linux." />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site">
+      <a class="brand" href="index.html"><span aria-hidden="true">/\o&gt;</span>wepwawet</a>
+      <nav aria-label="Documentation">
+        <a href="index.html">Overview</a>
+        <a href="installation.html">Installation</a>
+        <a href="usage.html">Usage</a>
+        <a href="configuration.html">Configuration</a>
+        <a href="cli.html" aria-current="page">CLI reference</a>
+        <a href="changelog.html">Changelog</a>
+      </nav>
+    </header>
+    <main>
+      <h1>CLI reference</h1>
+      <p class="lede">
+        Like Wireshark: <code>wepwawet</code> alone opens the window, sub-commands work in the terminal.
+        <code>wpw</code> is a short alias.
+      </p>
+
+      <h2><code>wepwawet</code> / <code>wepwawet gui</code></h2>
+      <p>
+        Open the application window. The local server starts on a free loopback port with a new session token and stops
+        when the window closes.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Option</th>
+              <th>Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>--browser</code></td>
+              <td>Open the interface in the system browser instead of a window. Stop with Ctrl+C.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2><code>wepwawet serve</code></h2>
+      <p>Start only the local server and print the address to open, including the session token.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Option</th>
+              <th>Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>--host HOST</code></td>
+              <td>
+                Address to listen on. Non-loopback addresses need
+                <code>server.allow_remote = true</code>.
+              </td>
+            </tr>
+            <tr>
+              <td><code>--port PORT</code></td>
+              <td>Port; default a free one.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2><code>wepwawet doctor</code></h2>
+      <p>
+        Check Python, the configuration, the directories, the window engine (Qt WebEngine and a display) and the local
+        traceroute tools. Exits with 1 when a check fails.
+      </p>
+
+      <h2><code>wepwawet version</code>, <code>--version</code>, <code>-V</code></h2>
+      <p>Print the version.</p>
+
+      <h2>Exit codes</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>0</code></td>
+              <td>Success</td>
+            </tr>
+            <tr>
+              <td><code>1</code></td>
+              <td>A <code>doctor</code> check failed</td>
+            </tr>
+            <tr>
+              <td><code>2</code></td>
+              <td>Invalid configuration or arguments, or the window cannot open</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>Local API</h2>
+      <p>
+        The interface talks to the local server over HTTP. Every route except
+        <code>/api/health</code> needs the session token (cookie set by <code>/auth?token=…</code>, or
+        <code>Authorization: Bearer</code>).
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Route</th>
+              <th>Answer</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>GET /api/health</code></td>
+              <td><code>{"status": "ok"}</code></td>
+            </tr>
+            <tr>
+              <td><code>GET /api/meta</code></td>
+              <td>Version and base map settings</td>
+            </tr>
+            <tr>
+              <td><code>GET /api/events</code></td>
+              <td>Server-sent events: <code>ready</code>, then heartbeats</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+    <footer class="site">
+      Wepwawet 0.1.0 · MIT licence ·
+      <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+    </footer>
+  </body>
+</html>

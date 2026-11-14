@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Changelog · Wepwawet</title>
+    <meta name="description" content="Wepwawet: measurement-based IP geolocation for Linux." />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site">
+      <a class="brand" href="index.html"><span aria-hidden="true">/\o&gt;</span>wepwawet</a>
+      <nav aria-label="Documentation">
+        <a href="index.html">Overview</a>
+        <a href="installation.html">Installation</a>
+        <a href="usage.html">Usage</a>
+        <a href="configuration.html">Configuration</a>
+        <a href="cli.html">CLI reference</a>
+        <a href="changelog.html" aria-current="page">Changelog</a>
+      </nav>
+    </header>
+    <main>
+      <h1>Changelog</h1>
+      <p class="lede">
+        The full history is in
+        <a href="https://github.com/n36l3c7/Wepwawet/blob/main/CHANGELOG.md">CHANGELOG.md</a>. Versions follow Semantic
+        Versioning.
+      </p>
+
+      <h2>0.1.0 · 2026-11-14</h2>
+      <p>First release: the application, without geolocation yet.</p>
+      <h3>Added</h3>
+      <ul>
+        <li>
+          Desktop window (Qt WebEngine): <code>wepwawet</code> with no arguments opens it;
+          <code>wepwawet gui --browser</code> opens the system browser instead.
+        </li>
+        <li>Interface with the "Sand &amp; turquoise" terminal theme and the animated ASCII jackal.</li>
+        <li>MapLibre map with CARTO dark (online, recoloured) and an offline Natural Earth map.</li>
+        <li>
+          Local API bound to loopback with a per-session token, a
+          <code>Host</code> check and a strict Content Security Policy; live log over server-sent events.
+        </li>
+        <li>
+          Command line: <code>gui</code>, <code>serve</code>, <code>doctor</code>, <code>version</code>;
+          <code>wpw</code> alias.
+        </li>
+        <li>Configuration file and environment variables, XDG directories, log redaction, SQLite cache.</li>
+        <li>Packages for x86_64 and arm64: .deb, .rpm, Arch Linux and AppImage.</li>
+      </ul>
+    </main>
+    <footer class="site">
+      Wepwawet 0.1.0 · MIT licence ·
+      <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+    </footer>
+  </body>
+</html>

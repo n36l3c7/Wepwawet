@@ -1,0 +1,86 @@
+[project]
+name = "wepwawet"
+version = "0.1.0"
+description = "Measurement-based IP geolocation: passive evidence plus ping and traceroute from many vantage points, on a map."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+authors = [{ name = "n36l3c7" }]
+keywords = ["geolocation", "ip", "traceroute", "multilateration", "osint", "network"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Web Environment",
+  "Environment :: X11 Applications :: Qt",
+  "Intended Audience :: Information Technology",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: System :: Networking",
+]
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn>=0.32",
+  "httpx>=0.28",
+  "pydantic>=2.9",
+  "sqlalchemy>=2.0.36",
+  "typer>=0.15",
+  "rich>=13.9",
+]
+
+[project.optional-dependencies]
+# Desktop window: pywebview on Qt WebEngine (LGPL PySide6, Chromium engine for MapLibre's WebGL).
+gui = ["pywebview[pyside6]>=5.3"]
+
+[project.scripts]
+wepwawet = "wepwawet.cli.main:run"
+wpw = "wepwawet.cli.main:run"
+
+[project.urls]
+Homepage = "https://github.com/n36l3c7/Wepwawet"
+Documentation = "https://n36l3c7.github.io/Wepwawet/"
+Changelog = "https://github.com/n36l3c7/Wepwawet/blob/main/CHANGELOG.md"
+
+[dependency-groups]
+dev = ["pytest>=8.3", "ruff>=0.8", "mypy>=1.13", "pre-commit>=4.0"]
+
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/wepwawet"]
+# The frontend is built by `npm run build` into this git-ignored folder and shipped in the wheel.
+artifacts = ["src/wepwawet/web/dist/**"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/wepwawet", "tests", "README.md", "CHANGELOG.md", "LICENSE"]
+artifacts = ["src/wepwawet/web/dist/**"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, bugbear, isort, pyupgrade, bandit-lite (S), simplify.
+select = ["E", "F", "W", "B", "I", "UP", "S", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "typer.Option", "typer.Argument"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["wepwawet"]
+mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = ["webview", "webview.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
