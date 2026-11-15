@@ -41,7 +41,13 @@ export const OPTION_GROUPS = [
         max: 65535,
       },
       { section: 'measurements', key: 'access_correction', label: 'Remove the access delay', type: 'bool' },
-      { section: 'measurements', key: 'calibrate', label: 'CBG calibration (RIPE Atlas anchors)', type: 'bool' },
+      {
+        section: 'measurements',
+        key: 'calibrate',
+        label: 'CBG calibration (RIPE Atlas anchors)',
+        type: 'bool',
+        help: 'The nearest probes also ping anchors around the region: tighter bounds, one test per probe and anchor.',
+      },
       {
         section: 'measurements',
         key: 'calibration_anchors',

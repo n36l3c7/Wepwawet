@@ -58,7 +58,12 @@
         <strong>Calibration (optional).</strong> Constraint-Based Geolocation (Gueye et al., 2006) tightens the bound
         per probe: each probe pings landmarks of known position (RIPE Atlas anchors) and Wepwawet fits the "bestline",
         the line <code>rtt = m·d + b</code> that stays below every landmark with the slope at least the physical
-        minimum. Inverted, it bounds the distance more tightly than the speed of light alone.
+        minimum. Inverted, it bounds the distance more tightly than the speed of light alone: the intercept
+        <code>b</code> is the delay that is not distance (routers answering, the probe's own line), which matters most
+        for the nearest probes, where a 1 ms RTT would otherwise allow 100 km. Wepwawet calibrates the probes of the
+        local zoom, after it, against RIPE Atlas anchors within 300 km of the region, picked at evenly spaced distances
+        (the nearest fix <code>b</code>, the farthest <code>m</code>). A calibrated bound keeps 10 km of slack, since
+        probe positions are published at city level, and never exceeds the speed-of-light bound.
       </p>
 
       <h2>3. The ping campaign</h2>
@@ -252,7 +257,7 @@
       </ul>
     </main>
     <footer class="site">
-      Wepwawet 1.3.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 1.4.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

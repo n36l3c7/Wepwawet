@@ -83,7 +83,8 @@ class MeasurementsConfig(_Section):
     tcp_fallback_port: int = Field(default=443, ge=0, le=65535)
     # Most tests (Globalping) or credits (RIPE Atlas, per provider max_credits) one target may use.
     max_tests: int = Field(default=150, ge=0)
-    # CBG calibration: ping RIPE Atlas anchors from the zoom probes and fit a delay-distance line per probe.
+    # CBG calibration: the nearest probes ping RIPE Atlas anchors around the region and each gets
+    # its own delay-distance line, which removes the delay that is not distance.
     calibrate: bool = False
     # Traceroutes from the fastest probes, after the pings (0 disables them).
     traceroute_probes: int = Field(default=5, ge=0, le=20)

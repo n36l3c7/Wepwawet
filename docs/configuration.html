@@ -198,8 +198,10 @@ enabled = false      # turn any source off</code></pre>
               <td><code>measurements.calibrate</code></td>
               <td><code>false</code></td>
               <td>
-                CBG calibration: the zoom probes also ping RIPE Atlas anchors of known position and get their own
-                delay-to-distance line. Costs zoom probes × anchors tests.
+                CBG calibration: the nearest probes (the local zoom) also ping RIPE Atlas anchors within 300 km of the
+                region and get their own delay-to-distance line, which removes the delay that is not distance. Costs
+                probes × anchors tests (about 20 × <code>calibration_anchors</code>); skipped when the budget cannot pay
+                for 2 anchors.
               </td>
             </tr>
             <tr>
@@ -399,7 +401,7 @@ censys = "…"</code></pre>
       </div>
     </main>
     <footer class="site">
-      Wepwawet 1.3.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 1.4.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

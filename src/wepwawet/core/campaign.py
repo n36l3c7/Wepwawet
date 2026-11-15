@@ -3,11 +3,12 @@
 1. Sweep: probes spread over every continent give a coarse idea (the fastest probe is near).
 2. Zoom: probes in the countries of the fastest probes and of the passive answers give tight
    constraints: a probe 2 ms away bounds the target to about 200 km.
-3. Optional CBG calibration: the zoom probes also ping RIPE Atlas anchors of known position,
+3. Local zoom: the most likely city and the target's own network.
+4. Optional CBG calibration: the nearest probes also ping RIPE Atlas anchors around the region,
    and each probe gets its own delay-to-distance line.
-4. Multilateration intersects the disks; disjoint disks far apart mean anycast.
-5. Local zoom, traceroutes and, experimental and off by default, landmarks of known position
-   matched to the target by RTT pattern (see ``landmarks``).
+5. Multilateration intersects the disks; disjoint disks far apart mean anycast.
+6. Traceroutes and, experimental and off by default, landmarks of known position matched to the
+   target by RTT pattern (see ``landmarks``).
 
 Each phase checks the test budget first and is skipped, with a log line, when it would exceed it.
 """
@@ -25,16 +26,19 @@ from wepwawet.core.ixp import load_ixp_index
 from wepwawet.core.landmarks import (
     ATLAS_PROBES_URL,
     MIN_SHARED_PROBES,
+    Landmark,
     choose,
     landmark_evidence,
     match,
     parse_landmarks,
     search_radius_km,
+    spread_by_distance,
 )
 from wepwawet.core.models import (
     Estimate,
     Evidence,
     EvidenceKind,
+    GeoPoint,
     ProbeResult,
     ProxyTarget,
     Region,
@@ -62,7 +66,11 @@ from wepwawet.providers.measurement.base import (
 
 # Share of the sweep per continent, roughly where probes and networks are.
 SWEEP_SHARES = (("EU", 0.27), ("NA", 0.25), ("AS", 0.2), ("SA", 0.1), ("OC", 0.1), ("AF", 0.08))
-ANCHORS_URL = "https://atlas.ripe.net/api/v2/anchors/"
+# Calibration anchors are searched this far from the region's centre: near ones fix the delay
+# that is not distance, far ones the slope.
+CALIBRATION_RADIUS_KM = 300
+# Probe positions are published at city level: a calibrated bound keeps this much slack.
+CALIBRATION_MARGIN_KM = 10.0
 MAX_ZOOM_COUNTRIES = 4
 MIN_PHASE_TESTS = 5  # below this a phase adds too little to be worth the tests
 MAX_PTR_LOOKUPS = 120
@@ -355,15 +363,15 @@ class Campaign:
                 self._finish_geometry(report)
                 progress()
 
-        # 3. Optional calibration of the zoom probes against RIPE Atlas anchors.
-        if cfg.calibrate and primary and primary.name in state.reuse:
-            await self._calibrate(report, primary, state, countries)
-            self._finish_geometry(report)
-            progress()
-
-        # 4. Local zoom: the most likely city and the target's own network.
+        # 3. Local zoom: the most likely city and the target's own network.
         if primary:
             await self._local_zoom(report, primary, state, progress)
+
+        # 4. Optional calibration of the nearest probes against RIPE Atlas anchors around the region.
+        if cfg.calibrate and primary:
+            await self._calibrate(report, primary, state)
+            self._finish_geometry(report)
+            progress()
 
         report.record_stage("pings", report.estimate if report.region else None)
 
@@ -700,63 +708,75 @@ class Campaign:
             self._log("info", "measure", f"Budget: using {allowed} of the {wanted} probes planned")
         return allowed
 
-    def _within_budget(self, state: CampaignState, needed: int) -> bool:
-        if state.tests_used + needed > state.limit:
-            left = max(0, state.limit - state.tests_used)
-            self._log("info", "measure", f"Skipping a phase: it needs {needed} tests, {left} left in the budget")
-            return False
-        return True
+    async def _calibrate(self, report: TargetReport, provider: MeasurementProvider, state: CampaignState) -> None:
+        """Fit a delay-distance line for each of the nearest probes on RIPE Atlas anchors around the region.
 
-    async def _calibrate(
-        self, report: TargetReport, provider: MeasurementProvider, state: CampaignState, countries: Sequence[str]
-    ) -> None:
+        The nearest probes bound the region, and most of their RTT is not distance: the time
+        routers take to answer, the probe's own access line. Anchors at known distances measure
+        that share for each probe, so its bound shrinks to what distance can explain. Bounds keep
+        ``CALIBRATION_MARGIN_KM`` of slack (probe positions are city-level) and never exceed the
+        speed-of-light bound.
+        """
         cfg = self._ctx.config.measurements
-        anchors = await self._anchors(countries, report.target.address.version, cfg.calibration_anchors)
-        zoom_size = len([r for r in report.probes if r.phase == "zoom"])
-        if not anchors or not self._within_budget(state, zoom_size * len(anchors)):
+        region, reference = report.region, state.reference
+        if region is None:
             return
-        self._log("info", "calibrate", f"Calibrating {zoom_size} probes against {len(anchors)} RIPE Atlas anchors")
-        points: dict[str, list[tuple[float, float]]] = {}
-        for address, lat, lon in anchors:
-            batch = await self._ping(
-                provider, Target(address=ipaddress.ip_address(address)), state.reuse[provider.name], state
+        if reference is None or reference.provider != provider.name:
+            self._log("info", "calibrate", "No probes to calibrate: skipped")
+            return
+        count = min(cfg.calibration_anchors, max(0, state.limit - state.tests_used) // max(1, reference.size))
+        if count < 2:
+            self._log("info", "calibrate", f"Skipped: {reference.size} tests per anchor, too few left in the budget")
+            return
+        anchors = await self._nearby_anchors(report, region.centroid, count)
+        if len(anchors) < 2:
+            self._log(
+                "info", "calibrate", f"Fewer than 2 RIPE Atlas anchors within {CALIBRATION_RADIUS_KM} km: skipped"
             )
+            return
+        self._log(
+            "info",
+            "calibrate",
+            f"Calibrating {reference.size} probes against {len(anchors)} RIPE Atlas anchors "
+            f"within {CALIBRATION_RADIUS_KM} km",
+        )
+        points: dict[str, list[tuple[float, float]]] = {}
+        for anchor in anchors:
+            target = Target(address=ipaddress.ip_address(anchor.address))
+            batch = await self._ping(provider, target, reference.reuse_key, state)
             for ping in batch.results if batch else []:
                 if ping.min_rtt is None:
                     continue
                 key = f"{ping.probe.provider}:{ping.probe.probe_id}"
-                distance = haversine(ping.probe.location.lat, ping.probe.location.lon, lat, lon)
+                distance = haversine(ping.probe.location.lat, ping.probe.location.lon, anchor.lat, anchor.lon)
                 points.setdefault(key, []).append((distance, ping.min_rtt))
         lines = {key: fit_bestline(pts, cfg.speed_km_per_ms) for key, pts in points.items() if len(pts) >= 2}
         updated = []
         for result in report.probes:
             key = f"{result.probe.provider}:{result.probe.probe_id}"
             if key in lines and result.min_rtt is not None:
-                distance = lines[key].max_distance_km(result.min_rtt)
+                physical = sol_max_distance_km(result.min_rtt, cfg.speed_km_per_ms)
+                distance = min(physical, lines[key].max_distance_km(result.min_rtt) + CALIBRATION_MARGIN_KM)
                 result = result.model_copy(update={"max_distance_km": round(distance, 1), "calibrated": True})
             updated.append(result)
         report.probes = updated
         self._log("info", "calibrate", f"{len(lines)} probes calibrated")
 
-    async def _anchors(self, countries: Sequence[str], version: int, count: int) -> list[tuple[str, float, float]]:
-        found: list[tuple[str, float, float]] = []
-        for country in countries:
-            try:
-                data, _ = await self._ctx.http.get_json(
-                    "ripe-anchors", ANCHORS_URL, params={"country": country, "page_size": 50}, ttl=7 * 86_400
-                )
-            except ProviderError as exc:
-                self._log("error", "calibrate", f"Anchors unavailable: {exc.message}")
-                return found
-            for anchor in (data or {}).get("results", []):
-                address = anchor.get("ip_v4" if version == 4 else "ip_v6")
-                geometry = anchor.get("geometry") or {}
-                if address and not anchor.get("is_disabled") and geometry.get("coordinates"):
-                    lon, lat = geometry["coordinates"]
-                    found.append((address, lat, lon))
-                if len(found) >= count:
-                    return found
-        return found
+    async def _nearby_anchors(self, report: TargetReport, centre: GeoPoint, count: int) -> list[Landmark]:
+        params = {
+            "radius": f"{centre.lat:.4f},{centre.lon:.4f}:{CALIBRATION_RADIUS_KM}",
+            "is_anchor": "true",
+            "status": 1,
+            "fields": "id,address_v4,address_v6,asn_v4,asn_v6,geometry,is_anchor",
+            "page_size": 200,
+        }
+        try:
+            data, _ = await self._ctx.http.get_json("ripe-anchors", ATLAS_PROBES_URL, params=params, ttl=7 * 86_400)
+        except ProviderError as exc:
+            self._log("error", "calibrate", f"Anchors unavailable: {exc.message}")
+            return []
+        found = parse_landmarks(data, report.target.address.version, str(report.target.address))
+        return spread_by_distance(found, centre, count)
 
     def _finish_geometry(self, report: TargetReport) -> None:
         """Region, anycast verdict, hard evidence and provisional estimate from the probes so far."""

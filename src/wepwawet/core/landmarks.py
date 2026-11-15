@@ -102,6 +102,21 @@ def choose(landmarks: Sequence[Landmark], centre: GeoPoint, count: int, asn: int
     return chosen
 
 
+def spread_by_distance(landmarks: Sequence[Landmark], centre: GeoPoint, count: int) -> list[Landmark]:
+    """``count`` landmarks at evenly spaced distance ranks from ``centre``, the nearest and farthest included.
+
+    A delay-distance line needs short and long distances: the nearest points fix its intercept
+    (the delay that is not distance), the farthest its slope.
+    """
+    ordered = sorted(landmarks, key=lambda lm: haversine(centre.lat, centre.lon, lm.lat, lm.lon))
+    if count <= 0 or not ordered:
+        return []
+    if count == 1 or len(ordered) <= count:
+        return ordered[:count]
+    picks = sorted({round(i * (len(ordered) - 1) / (count - 1)) for i in range(count)})
+    return [ordered[i] for i in picks]
+
+
 def match(target: Mapping[str, float], landmarks: Mapping[Landmark, Mapping[str, float]]) -> list[Match]:
     """Landmarks ranked by how closely their RTTs, probe by probe, follow the target's."""
     matches = []

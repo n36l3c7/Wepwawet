@@ -7,6 +7,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-15
+
+### Changed
+
+- CBG calibration (`measurements.calibrate`) now calibrates the nearest probes, those of the local
+  zoom (else the regional zoom), and runs after the local zoom. Its anchors are RIPE Atlas anchors
+  within 300 km of the region, picked at evenly spaced distances so the nearest ones measure the
+  delay that is not distance and the farthest the slope; before, it took the first anchors of the
+  zoom countries, often hundreds of kilometres away, and left the fastest probes uncalibrated.
+- A calibrated bound keeps 10 km of slack for the probe's city-level position and never exceeds
+  the speed-of-light bound. The phase is skipped, with a log line, when there are fewer than 2
+  anchors nearby or the budget cannot pay for 2 of them (one test per probe and anchor).
+
 ## [1.3.0] - 2026-11-15
 
 ### Added
