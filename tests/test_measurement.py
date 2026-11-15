@@ -225,7 +225,7 @@ def test_ssh_argv_quotes_nothing_from_the_user(app_paths: AppPaths) -> None:
     host = {"name": "vps1", "host": "vps.example", "user": "probe", "port": 2222, "lat": 50.1, "lon": 8.7}
     argv = SshPingProvider.argv(host, Target(address=ipaddress.ip_address("2001:7fd::1")), 3)
     assert argv[:5] == ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8"]
-    assert argv[-2:] == ["probe@vps.example", "ping -6 -n -c 3 -W 2 -i 0.3 2001:7fd::1"]
+    assert argv[-3:] == ["--", "probe@vps.example", "ping -6 -n -c 3 -W 2 -i 0.3 2001:7fd::1"]
     config = Config.model_validate({"providers": {"ssh": {"hosts": [host, {"host": "no-location"}]}}})
     assert len(SshPingProvider().hosts(make_ctx(app_paths, config=config))) == 1
 

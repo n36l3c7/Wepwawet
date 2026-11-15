@@ -13,6 +13,13 @@ export const OPTION_GROUPS = [
         help: 'software draws the map on the CPU; auto does so in virtual machines and without a GPU.',
       },
       { section: 'logging', key: 'level', label: 'Log level', choices: ['DEBUG', 'INFO', 'WARNING', 'ERROR'] },
+      {
+        section: 'cache',
+        key: 'default_ttl_seconds',
+        label: 'Cache lifetime of passive answers (seconds)',
+        type: 'int',
+        min: 1,
+      },
     ],
   },
   {
@@ -31,6 +38,15 @@ export const OPTION_GROUPS = [
         max: 500,
       },
       { section: 'measurements', key: 'packets', label: 'Packets per ping', type: 'int', min: 1, max: 16 },
+      {
+        section: 'measurements',
+        key: 'speed_km_per_ms',
+        label: 'Signal speed (km per ms, one way)',
+        type: 'float',
+        min: 51,
+        max: 300,
+        help: '200 is light in fibre; lower only for testing.',
+      },
       { section: 'measurements', key: 'traceroute_probes', label: 'Traceroutes', type: 'int', min: 0, max: 20 },
       {
         section: 'measurements',
@@ -68,6 +84,45 @@ export const OPTION_GROUPS = [
     ],
   },
 ]
+
+/** Options of single sources, shown under their name in the Sources section. */
+export const PROVIDER_OPTIONS = {
+  ripe_atlas: [
+    {
+      key: 'max_credits',
+      label: 'Most credits per target (0 = off)',
+      type: 'int',
+      min: 0,
+      help: 'A ping costs 6 credits per probe; nothing is spent while this is 0.',
+    },
+  ],
+  rdns: [{ key: 'sweep', label: 'Also look up the 254 neighbours in the /24', type: 'bool' }],
+  local: [
+    { key: 'lat', label: 'Latitude of this machine', type: 'float', min: -90, max: 90, nullable: true },
+    { key: 'lon', label: 'Longitude of this machine', type: 'float', min: -180, max: 180, nullable: true },
+  ],
+}
+
+/** An empty SSH host row for the editor. */
+export function emptySshHost() {
+  return { name: '', host: '', user: '', port: '', lat: '', lon: '' }
+}
+
+/** SSH host rows as the API expects them: blanks dropped, numbers as numbers. */
+export function sshHostsPayload(rows) {
+  return rows
+    .filter((row) => String(row.host ?? '').trim())
+    .map((row) => {
+      const host = { host: String(row.host).trim() }
+      for (const key of ['name', 'user']) {
+        if (String(row[key] ?? '').trim()) host[key] = String(row[key]).trim()
+      }
+      if (row.port !== '' && row.port !== null && row.port !== undefined) host.port = Number(row.port)
+      host.lat = row.lat === '' ? null : Number(row.lat)
+      host.lon = row.lon === '' ? null : Number(row.lon)
+      return host
+    })
+}
 
 /** Only the options that differ from `original`, in the shape the API expects. */
 export function changedValues(original, edited) {

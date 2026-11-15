@@ -30,14 +30,22 @@
 
       <h2 id="panel">Settings panel</h2>
       <p>
-        The <b>settings</b> button in the window sets the API keys, the base map, window rendering, the log level, the
-        measurement options and which sources run. Changes apply at once (window rendering at the next start) and are
-        refused while a run is in progress.
+        The <b>settings</b> button in the window sets the API keys and every option below except <code>[server]</code>:
+        the base map, window rendering, the log level, the cache lifetime, the measurement options, which sources run
+        and their own options (the RIPE Atlas credit cap, the reverse-DNS sweep, this machine's position and the SSH
+        probes, edited as rows). Changes apply at once (window rendering at the next start) and are refused while a run
+        is in progress.
       </p>
       <ul>
         <li>
           Options are saved in <code>~/.config/wepwawet/settings.toml</code>, layered over <code>config.toml</code>,
-          which the window never rewrites. An option fixed by an environment variable is shown locked.
+          which the window never rewrites. An option fixed by an environment variable is shown locked. Clearing an
+          option in the panel (an empty position, no SSH hosts) falls back to <code>config.toml</code>.
+        </li>
+        <li>
+          <code>[server]</code> is set only in <code>config.toml</code>: it decides who can reach the local API, which
+          the API itself must not change. SSH hosts and users are checked strictly, since they end up on an
+          <code>ssh</code> command line.
         </li>
         <li>
           Keys are saved in <code>secrets.toml</code> with mode 0600. They are never sent back to the window: it shows
@@ -401,7 +409,7 @@ censys = "…"</code></pre>
       </div>
     </main>
     <footer class="site">
-      Wepwawet 1.4.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 1.5.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

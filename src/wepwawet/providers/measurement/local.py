@@ -154,7 +154,8 @@ class SshPingProvider(MeasurementProvider):
         argv = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8"]
         if host.get("port"):
             argv += ["-p", str(int(host["port"]))]
-        return [*argv, destination, remote]
+        # "--" ends the options: a host name can never be read as one.
+        return [*argv, "--", destination, remote]
 
     async def ping(
         self,

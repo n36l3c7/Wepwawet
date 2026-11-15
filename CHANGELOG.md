@@ -7,6 +7,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-15
+
+### Added
+
+- The settings panel covers every option except `[server]`: the RIPE Atlas credit cap
+  (`providers.ripe_atlas.max_credits`), the reverse-DNS neighbour sweep, the position of this
+  machine (`providers.local.lat`/`lon`), the SSH probes (`providers.ssh.hosts`, edited as rows),
+  the signal speed and the cache lifetime. Clearing an option falls back to `config.toml`.
+- `settings.toml` can hold lists of tables (`[[providers.ssh.hosts]]`).
+
+### Security
+
+- SSH probe hosts and users from the panel are checked strictly (a host or user can never start with
+  `-` or contain spaces), and the `ssh` command line now ends its options with `--` before the
+  destination, so a host name can never be read as an option. `[server]` stays file-only: it
+  decides who can reach the local API, which the API must not change.
+
 ## [1.4.0] - 2026-11-15
 
 ### Changed

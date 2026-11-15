@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { fetchSettings, removeKey, saveKey, saveSettings } from '../../lib/api.js'
-import { OPTION_GROUPS, changedValues, keyState } from '../../lib/settings.js'
+import {
+  OPTION_GROUPS,
+  PROVIDER_OPTIONS,
+  changedValues,
+  emptySshHost,
+  keyState,
+  sshHostsPayload,
+} from '../../lib/settings.js'
 
 const inputClass = 'border border-line bg-canvas px-1.5 py-0.5 font-mono text-[12px] focus:border-accent outline-none'
 const buttonClass =
@@ -92,16 +99,18 @@ function OptionInput({ option, value, locked, onChange }) {
       </select>
     )
   } else {
+    const empty = option.nullable ? null : ''
     input = (
       <input
         id={id}
         type="number"
         min={option.min}
         max={option.max}
+        step={option.type === 'float' ? 'any' : 1}
         value={value ?? ''}
         disabled={locked}
-        onChange={(event) => onChange(event.target.value === '' ? '' : Number(event.target.value))}
-        className={`${inputClass} w-[90px] justify-self-end tabular-nums`}
+        onChange={(event) => onChange(event.target.value === '' ? empty : Number(event.target.value))}
+        className={`${inputClass} w-[110px] justify-self-end tabular-nums`}
       />
     )
   }
@@ -117,6 +126,58 @@ function OptionInput({ option, value, locked, onChange }) {
   )
 }
 
+const SSH_FIELDS = [
+  { key: 'name', label: 'name', width: 'w-[90px]' },
+  { key: 'host', label: 'host', width: 'min-w-0 flex-1' },
+  { key: 'user', label: 'user', width: 'w-[80px]' },
+  { key: 'port', label: 'port', width: 'w-[64px]', type: 'number' },
+  { key: 'lat', label: 'lat', width: 'w-[76px]', type: 'number' },
+  { key: 'lon', label: 'lon', width: 'w-[76px]', type: 'number' },
+]
+
+function SshHosts({ hosts, onChange }) {
+  const [rows, setRows] = useState(() => (hosts ?? []).map((h) => ({ ...emptySshHost(), ...h })))
+  const update = (next) => {
+    setRows(next)
+    onChange(sshHostsPayload(next))
+  }
+  return (
+    <div className="grid gap-1.5 pl-5">
+      <p className="text-[11px] text-fg-muted">
+        Your own servers, used as probes over SSH (key authentication only). Host, latitude and longitude are required.
+      </p>
+      {rows.map((row, index) => (
+        <div key={index} className="flex flex-wrap items-center gap-1.5">
+          {SSH_FIELDS.map((field) => (
+            <input
+              key={field.key}
+              aria-label={`SSH host ${index + 1} ${field.label}`}
+              placeholder={field.label}
+              type={field.type ?? 'text'}
+              step="any"
+              value={row[field.key] ?? ''}
+              onChange={(event) =>
+                update(rows.map((r, i) => (i === index ? { ...r, [field.key]: event.target.value } : r)))
+              }
+              className={`${inputClass} ${field.width}`}
+            />
+          ))}
+          <button type="button" className={buttonClass} onClick={() => update(rows.filter((_, i) => i !== index))}>
+            remove
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        className={`${buttonClass} justify-self-start`}
+        onClick={() => update([...rows, emptySshHost()])}
+      >
+        add SSH host
+      </button>
+    </div>
+  )
+}
+
 /** Settings window: API keys, the main options and the sources. Keys are write-only. */
 export default function SettingsDialog({ open, onClose, onChanged }) {
   const dialogRef = useRef(null)
@@ -124,6 +185,7 @@ export default function SettingsDialog({ open, onClose, onChanged }) {
   const [values, setValues] = useState(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState(null)
+  const [revision, setRevision] = useState(0) // remounts drafts (SSH rows) after save or undo
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -154,6 +216,7 @@ export default function SettingsDialog({ open, onClose, onChanged }) {
       const data = await action()
       setView(data)
       setValues(data.values)
+      setRevision((r) => r + 1)
       setMessage({ tone: 'ok', text: success })
       onChanged?.(data)
       return true
@@ -171,6 +234,8 @@ export default function SettingsDialog({ open, onClose, onChanged }) {
     Object.keys(keys).some((key) => view.restart_required.includes(`${section}.${key}`)),
   )
   const setOption = (section, key, value) => setValues((v) => ({ ...v, [section]: { ...v[section], [key]: value } }))
+  const setSource = (name, patch) =>
+    setValues((v) => ({ ...v, providers: { ...v.providers, [name]: { ...v.providers?.[name], ...patch } } }))
 
   return (
     <dialog
@@ -226,7 +291,7 @@ export default function SettingsDialog({ open, onClose, onChanged }) {
                   <input
                     type="checkbox"
                     checked={values.providers?.[source.name]?.enabled ?? true}
-                    onChange={(event) => setOption('providers', source.name, { enabled: event.target.checked })}
+                    onChange={(event) => setSource(source.name, { enabled: event.target.checked })}
                     className="m-0 accent-[var(--color-accent)]"
                   />
                   {source.label}
@@ -234,9 +299,33 @@ export default function SettingsDialog({ open, onClose, onChanged }) {
                 </label>
               ))}
             </div>
+            {view.sources
+              .filter((source) => PROVIDER_OPTIONS[source.name] || source.name === 'ssh')
+              .map((source) => (
+                <div key={source.name} className="grid gap-1.5 border-t border-line-soft pt-2">
+                  <span className="font-mono text-[11px] text-fg-subtle">{source.label}</span>
+                  {(PROVIDER_OPTIONS[source.name] ?? []).map((option) => (
+                    <OptionInput
+                      key={option.key}
+                      option={{ ...option, section: `source-${source.name}` }}
+                      value={values.providers?.[source.name]?.[option.key]}
+                      locked={false}
+                      onChange={(value) => setSource(source.name, { [option.key]: value })}
+                    />
+                  ))}
+                  {source.name === 'ssh' ? (
+                    <SshHosts
+                      key={revision}
+                      hosts={view.values.providers?.ssh?.hosts}
+                      onChange={(hosts) => setSource('ssh', { hosts })}
+                    />
+                  ) : null}
+                </div>
+              ))}
           </Section>
           <p className="text-[11.5px] text-fg-muted">
-            Options are saved in <code className="font-mono">{view.files.settings}</code>, over your config.toml.
+            Options are saved in <code className="font-mono">{view.files.settings}</code>, over your config.toml. Only
+            the [server] section (who can reach this window) stays in config.toml.
           </p>
         </div>
       )}
@@ -249,7 +338,15 @@ export default function SettingsDialog({ open, onClose, onChanged }) {
         {needsRestart ? (
           <span className="text-[11.5px] text-warn">Window rendering applies at the next start.</span>
         ) : null}
-        <button type="button" className={buttonClass} disabled={!dirty || busy} onClick={() => setValues(view.values)}>
+        <button
+          type="button"
+          className={buttonClass}
+          disabled={!dirty || busy}
+          onClick={() => {
+            setValues(view.values)
+            setRevision((r) => r + 1)
+          }}
+        >
           undo
         </button>
         <button

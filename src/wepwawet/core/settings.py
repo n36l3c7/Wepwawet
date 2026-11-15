@@ -2,17 +2,20 @@
 
 ``settings.toml`` sits in the configuration directory and is layered over ``config.toml``
 (environment variables still win), so a hand-written ``config.toml`` is never rewritten. Only
-the options listed in ``EDITABLE`` and ``providers.<name>.enabled`` can be set from the window;
-everything else stays in ``config.toml``.
+the options listed in ``EDITABLE``, ``providers.<name>.enabled`` and the source options in
+``PROVIDER_OPTIONS`` can be set from the window. The ``[server]`` section stays in ``config.toml``
+on purpose: it decides who can reach the local API, which the API itself must not change.
 
 API keys are written to ``secrets.toml`` with mode 0600. Their values are never read back:
 the window only learns whether a key is set and where it comes from.
 """
 
+import math
 import os
+import re
 import stat
 import tomllib
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -28,8 +31,10 @@ EDITABLE: dict[str, tuple[str, ...]] = {
     "map": ("basemap",),
     "gui": ("rendering",),
     "logging": ("level",),
+    "cache": ("default_ttl_seconds",),
     "measurements": (
         "enabled",
+        "speed_km_per_ms",
         "sweep_probes",
         "zoom_probes",
         "local_probes",
@@ -44,6 +49,11 @@ EDITABLE: dict[str, tuple[str, ...]] = {
     ),
 }
 RESTART_REQUIRED = ("gui.rendering",)
+MAX_SSH_HOSTS = 20
+MAX_CREDITS = 1_000_000
+HOST_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9.:-]{0,252}")  # a name or address; never an ssh option
+USER_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_.-]{0,31}")
+LABEL_PATTERN = re.compile(r"[\w .,'()-]{1,64}")
 ENV_OPTIONS = {
     "map.basemap": "WEPWAWET_BASEMAP",
     "gui.rendering": "WEPWAWET_RENDERING",
@@ -53,6 +63,75 @@ ENV_OPTIONS = {
 
 class SettingsError(Exception):
     """A setting or a key is invalid, or a file cannot be written."""
+
+
+def _number(value: Any, name: str, low: float, high: float) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+        raise SettingsError(f"{name} must be a number")
+    if not low <= value <= high:
+        raise SettingsError(f"{name} must be between {low:g} and {high:g}")
+    return value
+
+
+def _credits(value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise SettingsError("providers.ripe_atlas.max_credits must be a whole number")
+    return int(_number(value, "providers.ripe_atlas.max_credits", 0, MAX_CREDITS))
+
+
+def _flag(value: Any) -> bool:
+    if not isinstance(value, bool):
+        raise SettingsError("providers.rdns.sweep must be true or false")
+    return value
+
+
+def _coordinate(name: str, limit: float) -> Callable[[Any], float | None]:
+    def check(value: Any) -> float | None:
+        return None if value is None else _number(value, name, -limit, limit)
+
+    return check
+
+
+def _text(value: Any, pattern: re.Pattern[str], name: str) -> str:
+    if not isinstance(value, str) or not pattern.fullmatch(value.strip()):
+        raise SettingsError(f"{name} is not valid")
+    return value.strip()
+
+
+def _ssh_hosts(value: Any) -> list[dict[str, Any]]:
+    """Validate ``[[providers.ssh.hosts]]``: these strings end up on an ``ssh`` command line."""
+    if not isinstance(value, list) or len(value) > MAX_SSH_HOSTS:
+        raise SettingsError(f"providers.ssh.hosts must be a list of at most {MAX_SSH_HOSTS} hosts")
+    hosts = []
+    for index, raw in enumerate(value, 1):
+        where = f"SSH host {index}"
+        if not isinstance(raw, Mapping) or set(raw) - {"name", "host", "user", "port", "lat", "lon", "city"}:
+            raise SettingsError(f"{where}: unknown fields")
+        host: dict[str, Any] = {"host": _text(raw.get("host"), HOST_PATTERN, f"{where}: host")}
+        for key, pattern in (("name", LABEL_PATTERN), ("city", LABEL_PATTERN), ("user", USER_PATTERN)):
+            if raw.get(key) not in (None, ""):
+                host[key] = _text(raw[key], pattern, f"{where}: {key}")
+        if raw.get("port") not in (None, ""):
+            port = raw["port"]
+            if isinstance(port, bool) or not isinstance(port, int):
+                raise SettingsError(f"{where}: port must be a whole number")
+            host["port"] = int(_number(port, f"{where}: port", 1, 65535))
+        host["lat"] = _number(raw.get("lat"), f"{where}: lat", -90, 90)
+        host["lon"] = _number(raw.get("lon"), f"{where}: lon", -180, 180)
+        hosts.append(host)
+    return hosts
+
+
+# Source options the window may change, each with its validator and its default when unset.
+PROVIDER_OPTIONS: dict[str, dict[str, tuple[Callable[[Any], Any], Any]]] = {
+    "ripe_atlas": {"max_credits": (_credits, 0)},
+    "rdns": {"sweep": (_flag, True)},
+    "local": {
+        "lat": (_coordinate("providers.local.lat", 90), None),
+        "lon": (_coordinate("providers.local.lon", 180), None),
+    },
+    "ssh": {"hosts": (_ssh_hosts, [])},
+}
 
 
 def _read_toml(path: Path) -> dict[str, Any]:
@@ -76,8 +155,23 @@ def _toml_value(value: Any) -> str:
     raise SettingsError(f"unsupported value type {type(value).__name__}")
 
 
+def _is_table_list(value: Any) -> bool:
+    return isinstance(value, list) and bool(value) and all(isinstance(v, Mapping) for v in value)
+
+
+def _table_lines(name: str, table: Mapping[str, Any]) -> list[str]:
+    """``[name]`` with its scalars, then each list of tables as ``[[name.key]]`` blocks."""
+    scalars = {k: v for k, v in table.items() if not _is_table_list(v)}
+    lines = ["", f"[{name}]"] + [f"{k} = {_toml_value(v)}" for k, v in scalars.items()]
+    for key, items in table.items():
+        if _is_table_list(items):
+            for item in items:
+                lines += ["", f"[[{name}.{key}]]"] + [f"{k} = {_toml_value(v)}" for k, v in item.items()]
+    return lines
+
+
 def dump_toml(data: Mapping[str, Any], header: str = "") -> str:
-    """TOML for tables of scalars, with one level of sub-tables (``[providers.<name>]``)."""
+    """TOML for tables of scalars, one level of sub-tables (``[providers.<name>]``) and lists of tables in them."""
     lines = [header] if header else []
     for section, values in data.items():
         if not isinstance(values, Mapping):
@@ -87,7 +181,7 @@ def dump_toml(data: Mapping[str, Any], header: str = "") -> str:
         if scalars:
             lines += ["", f"[{section}]"] + [f"{k} = {_toml_value(v)}" for k, v in scalars.items()]
         for name, table in tables.items():
-            lines += ["", f"[{section}.{name}]"] + [f"{k} = {_toml_value(v)}" for k, v in table.items()]
+            lines += _table_lines(f"{section}.{name}", table)
     return "\n".join(lines).lstrip("\n") + "\n"
 
 
@@ -113,13 +207,7 @@ def _clean_update(update: Mapping[str, Any], provider_names: set[str]) -> dict[s
             raise SettingsError(f"{section} must be an object")
         if section == "providers":
             for name, options in values.items():
-                if name not in provider_names:
-                    raise SettingsError(f"unknown source {name}")
-                if not isinstance(options, Mapping) or set(options) - {"enabled"}:
-                    raise SettingsError(f"only providers.{name}.enabled can be changed from the window")
-                if not isinstance(options.get("enabled"), bool):
-                    raise SettingsError(f"providers.{name}.enabled must be true or false")
-                clean.setdefault("providers", {})[name] = {"enabled": options["enabled"]}
+                clean.setdefault("providers", {})[name] = _clean_provider(name, options, provider_names)
             continue
         allowed = EDITABLE.get(section)
         if allowed is None:
@@ -131,10 +219,31 @@ def _clean_update(update: Mapping[str, Any], provider_names: set[str]) -> dict[s
     return clean
 
 
+def _clean_provider(name: str, options: Any, provider_names: set[str]) -> dict[str, Any]:
+    """``enabled`` and the options of ``PROVIDER_OPTIONS``; None removes an option from settings.toml."""
+    if name not in provider_names:
+        raise SettingsError(f"unknown source {name}")
+    allowed = PROVIDER_OPTIONS.get(name, {})
+    if not isinstance(options, Mapping) or set(options) - {"enabled", *allowed}:
+        raise SettingsError(f"providers.{name}: only enabled{''.join(', ' + k for k in allowed)} can be changed")
+    clean: dict[str, Any] = {}
+    if "enabled" in options:
+        if not isinstance(options["enabled"], bool):
+            raise SettingsError(f"providers.{name}.enabled must be true or false")
+        clean["enabled"] = options["enabled"]
+    for key, (validate, _default) in allowed.items():
+        if key in options:
+            clean[key] = validate(options[key])
+    return clean
+
+
 def _merge(base: dict[str, Any], override: Mapping[str, Any]) -> dict[str, Any]:
+    """``override`` over ``base``; a None value removes the key, a list replaces the whole list."""
     merged = dict(base)
     for key, value in override.items():
-        if isinstance(value, Mapping) and isinstance(merged.get(key), dict):
+        if value is None or value == []:
+            merged.pop(key, None)
+        elif isinstance(value, Mapping) and isinstance(merged.get(key), dict):
             merged[key] = _merge(merged[key], value)
         else:
             merged[key] = value
@@ -227,5 +336,11 @@ def editable_values(config: Config, provider_names: list[str]) -> dict[str, Any]
     values: dict[str, Any] = {
         section: {key: getattr(getattr(config, section), key) for key in keys} for section, keys in EDITABLE.items()
     }
-    values["providers"] = {name: {"enabled": config.provider(name).enabled} for name in provider_names}
+    providers: dict[str, Any] = {}
+    for name in provider_names:
+        settings = config.provider(name)
+        providers[name] = {"enabled": settings.enabled}
+        for key, (_validate, default) in PROVIDER_OPTIONS.get(name, {}).items():
+            providers[name][key] = settings.option(key, default)
+    values["providers"] = providers
     return values

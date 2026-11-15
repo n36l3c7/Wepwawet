@@ -10,7 +10,7 @@ Measurement-based IP geolocation for Linux: passive evidence plus ping and trace
 
 ![Wepwawet locating 77.109.180.62, a RIPE Atlas anchor in Winterthur: the RTT region over Zurich, the probes, the traceroutes and the estimate with its reasons](docs/img/main-window.png)
 
-> **v1.4.0.** Passive sources, about 80 probes, a feasible region, traceroutes read router by router,
+> **v1.5.0.** Passive sources, about 80 probes, a feasible region, traceroutes read router by router,
 > and one fused estimate with its uncertainty, confidence and reasons; history with diff, export, bulk mode
 > and an accuracy benchmark. How it works, and where it stops: [Methodology](https://n36l3c7.github.io/Wepwawet/methodology.html).
 
@@ -52,17 +52,17 @@ Download the package for your distribution from the
 
 ```sh
 # Debian, Ubuntu, Kali
-sudo apt install ./wepwawet_1.4.0-1_amd64.deb
+sudo apt install ./wepwawet_1.5.0-1_amd64.deb
 
 # Fedora
-sudo dnf install ./wepwawet-1.4.0-1.x86_64.rpm
+sudo dnf install ./wepwawet-1.5.0-1.x86_64.rpm
 
 # Arch Linux
-sudo pacman -U wepwawet-1.4.0-1-x86_64.pkg.tar.zst
+sudo pacman -U wepwawet-1.5.0-1-x86_64.pkg.tar.zst
 
 # Any distribution: AppImage (needs libfuse2, or run it with --appimage-extract-and-run)
-chmod +x Wepwawet-1.4.0-x86_64.AppImage
-./Wepwawet-1.4.0-x86_64.AppImage
+chmod +x Wepwawet-1.5.0-x86_64.AppImage
+./Wepwawet-1.5.0-x86_64.AppImage
 ```
 
 The packages install the system libraries Qt needs and recommend `mtr` and `traceroute` for measurements
@@ -155,10 +155,11 @@ what that means for the answer.
 
 ## Configuration
 
-Wepwawet works without configuration. The **settings** button in the window sets the API keys, the map,
-the measurement options and the sources; it saves them in `~/.config/wepwawet/settings.toml` (options)
-and `secrets.toml` (keys, never shown again). For everything else, create
-`~/.config/wepwawet/config.toml`:
+Wepwawet works without configuration. The **settings** button in the window sets the API keys and every
+option except `[server]`: the map, the measurements, the sources and their options (RIPE Atlas credit cap,
+this machine's position, SSH probes). It saves them in `~/.config/wepwawet/settings.toml` (options) and
+`secrets.toml` (keys, never shown again). `[server]`, which decides who can reach the window, is set only in
+`~/.config/wepwawet/config.toml`, which also takes every other option:
 
 ```toml
 [server]
@@ -289,6 +290,7 @@ wepwawet benchmark --anchors 10 --max-tests 100 -o benchmark.csv
 | 1.2.1 | Proxy where the paths meet, no access correction for routers, blank VM window (done) |
 | 1.3.0 | Landmark refinement with RIPE Atlas probes (experimental, done) |
 | 1.4.0 | Calibration of the nearest probes against anchors around the region (done) |
+| 1.5.0 | Every option but [server] in the settings panel, SSH probes included (done) |
 
 ## Development
 
