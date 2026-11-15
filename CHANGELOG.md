@@ -7,6 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-15
+
+### Fixed
+
+- The map overlays disappeared after switching to the CARTO base map, and could miss updates while
+  CARTO tiles were loading: they are now drawn as soon as the style is parsed.
+- The desktop window showed no map where Chromium blocklists the GPU (virtual machines, drivers without
+  DRI3): it now uses software rendering (SwiftShader) in virtual machines and without a GPU render node.
+  `gui.rendering` (or `WEPWAWET_RENDERING`) forces `software` or `hardware`.
+- A run whose measurement quota was exhausted fell back to passive sources without saying so: the
+  report now carries a caveat with the time until the quota resets.
+
 ## [1.0.0] - 2026-11-15
 
 The first stable release: the CLI, the configuration and the API are now covered by Semantic Versioning.

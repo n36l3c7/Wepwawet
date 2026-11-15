@@ -160,9 +160,14 @@ const PATH_COLOR = (palette) => [
   palette.accent,
 ]
 
-/** Add (after a style change) or update every overlay source and layer, honouring visibility. */
+/**
+ * Add (after a style change) or update every overlay source and layer, honouring visibility.
+ *
+ * `isStyleLoaded()` stays false while a vector base map still fetches its tiles, even after
+ * `style.load`: the overlays only need the style itself, so they are drawn once it is parsed.
+ */
 function drawOverlays(map, data, visible) {
-  if (!map.isStyleLoaded()) return
+  if (!map.style?._loaded) return
   const palette = readPalette()
   for (const [name, geojson] of Object.entries(data)) {
     const id = `wpw-src-${name}`
@@ -396,8 +401,9 @@ export default function MapView({
           <AsciiJackal mood="x" tone="muted" />
           <p className="font-mono text-sm text-high">The map cannot start: {webglError}.</p>
           <p className="text-fg-muted">
-            This display has no working WebGL. Open Wepwawet in your browser instead:{' '}
-            <code className="font-mono text-accent-fg">wepwawet gui --browser</code>
+            This display has no working WebGL. Start the window with software rendering:{' '}
+            <code className="font-mono text-accent-fg">WEPWAWET_RENDERING=software wepwawet</code>, or open it in
+            your browser: <code className="font-mono text-accent-fg">wepwawet gui --browser</code>
           </p>
         </div>
       </div>

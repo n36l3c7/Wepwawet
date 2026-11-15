@@ -28,6 +28,17 @@
         Versions follow Semantic Versioning.
       </p>
 
+      <h2>1.0.1 · 2026-11-15</h2>
+      <h3>Fixed</h3>
+      <ul>
+        <li>The map overlays disappeared after switching to the CARTO base map.</li>
+        <li>
+          The window showed no map where Chromium blocklists the GPU (virtual machines, drivers without DRI3): software
+          rendering is now used there, and <code>gui.rendering</code> forces it either way.
+        </li>
+        <li>A run whose measurement quota was exhausted now says so instead of silently staying passive.</li>
+      </ul>
+
       <h2>1.0.0 · 2026-11-15</h2>
       <p>The first stable release.</p>
       <h3>Added</h3>
@@ -170,7 +181,7 @@
       <p>First release: the window, the map, the local server, the command line and the Linux packages.</p>
     </main>
     <footer class="site">
-      Wepwawet 1.0.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 1.0.1 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

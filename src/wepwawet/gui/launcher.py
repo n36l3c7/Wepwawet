@@ -12,7 +12,8 @@ import os
 import sys
 import threading
 import webbrowser
-from typing import Any
+from pathlib import Path
+from typing import Any, Literal
 
 from wepwawet.api.app import create_app
 from wepwawet.api.server import BackgroundServer, base_url, bind_socket, new_token
@@ -23,6 +24,21 @@ log = logging.getLogger(__name__)
 WINDOW_TITLE = "Wepwawet"
 WINDOW_BACKGROUND = "#100e0a"  # canvas colour of the Sand & turquoise palette, avoids a white flash
 SMOKE_TEST_TIMEOUT_SECONDS = 60.0
+# DMI vendors and products of hypervisors: their virtual GPUs are usually blocklisted by Chromium.
+VM_MARKERS = (
+    "vmware",
+    "virtualbox",
+    "innotek",
+    "qemu",
+    "kvm",
+    "xen",
+    "parallels",
+    "bochs",
+    "hyper-v",
+    "virtual machine",
+)
+SOFTWARE_FLAGS: tuple[str, ...] = ("--use-angle=swiftshader", "--enable-unsafe-swiftshader")
+HARDWARE_FLAGS: tuple[str, ...] = ("--ignore-gpu-blocklist",)
 
 
 class GuiUnavailableError(Exception):
@@ -32,6 +48,35 @@ class GuiUnavailableError(Exception):
 def has_display(environ: dict[str, str] | None = None) -> bool:
     env = os.environ if environ is None else environ
     return bool(env.get("DISPLAY") or env.get("WAYLAND_DISPLAY"))
+
+
+def is_virtual_or_headless_gpu(root: Path = Path("/")) -> bool:
+    """True in a virtual machine or without a GPU render node, where WebGL usually fails."""
+    if not any((root / "dev" / "dri").glob("renderD*")):
+        return True
+    for name in ("sys_vendor", "product_name"):
+        with contextlib.suppress(OSError):
+            text = (root / "sys" / "class" / "dmi" / "id" / name).read_text(encoding="utf-8", errors="replace")
+            if any(marker in text.lower() for marker in VM_MARKERS):
+                return True
+    return False
+
+
+def chromium_flags(mode: Literal["auto", "software", "hardware"], existing: str = "", root: Path = Path("/")) -> str:
+    """``QTWEBENGINE_CHROMIUM_FLAGS`` for ``mode``, keeping the flags the user already set.
+
+    SwiftShader draws WebGL on the CPU; the window shows only this application, so the warning
+    behind ``--enable-unsafe-swiftshader`` (untrusted web pages) does not apply.
+    """
+    extra: tuple[str, ...]
+    if mode == "hardware":
+        extra = HARDWARE_FLAGS
+    elif mode == "software" or is_virtual_or_headless_gpu(root):
+        extra = SOFTWARE_FLAGS
+    else:
+        extra = ()
+    current = existing.split()
+    return " ".join(current + [flag for flag in extra if flag not in current])
 
 
 def _import_webview() -> Any:
@@ -54,6 +99,10 @@ def launch(config: Config, *, browser: bool = False, smoke_test: bool = False) -
             "No graphical display found (DISPLAY and WAYLAND_DISPLAY are unset). "
             "Use 'wepwawet serve' to start the server only, or see 'wepwawet --help'."
         )
+    if not browser and sys.platform.startswith("linux"):
+        flags = chromium_flags(config.gui.rendering, os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", ""))
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = flags
+        log.info("Window rendering", extra={"fields": {"mode": config.gui.rendering, "flags": flags or "-"}})
     webview = None if browser else _import_webview()
 
     token = new_token()

@@ -213,9 +213,15 @@ class Campaign:
             budget = await primary.budget(self._ctx)
             if budget is not None and budget.unit == "tests/hour" and budget.remaining is not None:
                 state.limit = min(state.limit, budget.remaining)
+                wait = f"; resets in {budget.reset_seconds // 60} min" if budget.reset_seconds else ""
                 if budget.remaining < cfg.sweep_probes:
-                    wait = f"; resets in {budget.reset_seconds // 60} min" if budget.reset_seconds else ""
                     self._log("info", primary.name, f"Only {budget.remaining} tests left this hour{wait}")
+                if budget.remaining < MIN_PHASE_TESTS:
+                    report.caveats.append(
+                        f"No measurement ran: {primary.label} has {budget.remaining} tests left this hour{wait}. "
+                        "This result comes from passive sources only; run it again later, or add a "
+                        f"{primary.label} token for a larger hourly quota."
+                    )
 
         # 1. Sweep (plus every fixed vantage point, which costs nothing).
         jobs = [self._ping(p, target, [], state) for p in fixed]

@@ -6,6 +6,7 @@ Environment variables:
 - ``WEPWAWET_HOST`` / ``WEPWAWET_PORT``: address of the local server.
 - ``WEPWAWET_LOG_LEVEL``: ``DEBUG``, ``INFO``, ``WARNING`` or ``ERROR``.
 - ``WEPWAWET_BASEMAP``: ``carto`` or ``offline``.
+- ``WEPWAWET_RENDERING``: ``auto``, ``software`` or ``hardware`` (desktop window graphics).
 """
 
 import os
@@ -38,6 +39,12 @@ class ServerConfig(_Section):
 
 class MapConfig(_Section):
     basemap: Literal["carto", "offline"] = "carto"
+
+
+class GuiConfig(_Section):
+    # How the desktop window draws the map: "auto" uses software rendering (SwiftShader) in virtual
+    # machines and without a GPU render node, "software" always, "hardware" also on blocklisted drivers.
+    rendering: Literal["auto", "software", "hardware"] = "auto"
 
 
 class CacheConfig(_Section):
@@ -95,6 +102,7 @@ class ProviderSettings(BaseModel):
 class Config(_Section):
     server: ServerConfig = Field(default_factory=ServerConfig)
     map: MapConfig = Field(default_factory=MapConfig)
+    gui: GuiConfig = Field(default_factory=GuiConfig)
     cache: CacheConfig = Field(default_factory=CacheConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     measurements: MeasurementsConfig = Field(default_factory=MeasurementsConfig)
@@ -118,6 +126,7 @@ def _env_overrides(environ: dict[str, str]) -> dict[str, Any]:
         "WEPWAWET_PORT": ("server", "port"),
         "WEPWAWET_LOG_LEVEL": ("logging", "level"),
         "WEPWAWET_BASEMAP": ("map", "basemap"),
+        "WEPWAWET_RENDERING": ("gui", "rendering"),
     }
     for variable, (section, key) in mapping.items():
         if variable in environ:

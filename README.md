@@ -10,7 +10,7 @@ Measurement-based IP geolocation for Linux: passive evidence plus ping and trace
 
 ![Wepwawet locating 77.109.180.62, a RIPE Atlas anchor in Winterthur: the RTT region over Zurich, the probes, the traceroutes and the estimate with its reasons](docs/img/main-window.png)
 
-> **v1.0.0.** Passive sources, about 80 probes, a feasible region, traceroutes read router by router,
+> **v1.0.1.** Passive sources, about 80 probes, a feasible region, traceroutes read router by router,
 > and one fused estimate with its uncertainty, confidence and reasons; history with diff, export, bulk mode
 > and an accuracy benchmark. How it works, and where it stops: [Methodology](https://n36l3c7.github.io/Wepwawet/methodology.html).
 
@@ -52,17 +52,17 @@ Download the package for your distribution from the
 
 ```sh
 # Debian, Ubuntu, Kali
-sudo apt install ./wepwawet_1.0.0-1_amd64.deb
+sudo apt install ./wepwawet_1.0.1-1_amd64.deb
 
 # Fedora
-sudo dnf install ./wepwawet-1.0.0-1.x86_64.rpm
+sudo dnf install ./wepwawet-1.0.1-1.x86_64.rpm
 
 # Arch Linux
-sudo pacman -U wepwawet-1.0.0-1-x86_64.pkg.tar.zst
+sudo pacman -U wepwawet-1.0.1-1-x86_64.pkg.tar.zst
 
 # Any distribution: AppImage (needs libfuse2, or run it with --appimage-extract-and-run)
-chmod +x Wepwawet-1.0.0-x86_64.AppImage
-./Wepwawet-1.0.0-x86_64.AppImage
+chmod +x Wepwawet-1.0.1-x86_64.AppImage
+./Wepwawet-1.0.1-x86_64.AppImage
 ```
 
 The packages install the system libraries Qt needs and recommend `mtr` and `traceroute` for measurements
@@ -161,6 +161,9 @@ allow_remote = false
 [map]
 basemap = "carto"    # "carto" (online, CARTO dark) or "offline" (bundled Natural Earth outlines)
 
+[gui]
+rendering = "auto"   # "software" draws the map on the CPU; "auto" does so in VMs and without a GPU
+
 [cache]
 default_ttl_seconds = 86400
 ttl_seconds = { rdap = 604800 }   # per-source overrides
@@ -212,6 +215,7 @@ censys = "..."
 | `WEPWAWET_CONFIG` | Path of the configuration file |
 | `WEPWAWET_HOST`, `WEPWAWET_PORT` | `server.host`, `server.port` |
 | `WEPWAWET_BASEMAP` | `map.basemap` |
+| `WEPWAWET_RENDERING` | `gui.rendering` |
 | `WEPWAWET_LOG_LEVEL` | `logging.level` |
 | `WEPWAWET_TOKEN` | Fixed session token for `wepwawet serve` (24+ characters) |
 
@@ -263,6 +267,9 @@ wepwawet benchmark --anchors 10 --max-tests 100 -o benchmark.csv
 | 0.4.0 | Traceroutes, location hints from router names, IXPs, path convergence (done) |
 | 0.5.0 | Evidence fusion and confidence, history and diff, export, bulk mode (done) |
 | 1.0.0 | Accuracy benchmark, hardening, complete documentation (done) |
+| 1.0.1 | Map overlays on CARTO, software rendering for VMs, exhausted-quota caveat (done) |
+| 1.1.0 | Settings panel: API keys and options from the window |
+| 1.2.0 | City and same-network zoom for residential addresses |
 | later | Landmark-based refinement (street-level, experimental) |
 
 ## Development

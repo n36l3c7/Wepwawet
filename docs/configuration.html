@@ -38,6 +38,9 @@ allow_remote = false
 [map]
 basemap = "carto"    # "carto" or "offline"
 
+[gui]
+rendering = "auto"   # "auto", "software" or "hardware"
+
 [cache]
 default_ttl_seconds = 86400
 ttl_seconds = { rdap = 604800 }   # per-source overrides
@@ -105,6 +108,15 @@ enabled = false      # turn any source off</code></pre>
               <td><code>map.basemap</code></td>
               <td><code>carto</code></td>
               <td>Base map shown at start-up: <code>carto</code> or <code>offline</code>.</td>
+            </tr>
+            <tr>
+              <td><code>gui.rendering</code></td>
+              <td><code>auto</code></td>
+              <td>
+                How the window draws the map. <code>auto</code> uses software rendering (SwiftShader) in virtual machines
+                and without a GPU render node, where Chromium blocklists the GPU; <code>software</code> always does;
+                <code>hardware</code> also tries a blocklisted driver.
+              </td>
             </tr>
             <tr>
               <td><code>cache.default_ttl_seconds</code></td>
@@ -299,6 +311,10 @@ censys = "…"</code></pre>
               <td><code>map.basemap</code></td>
             </tr>
             <tr>
+              <td><code>WEPWAWET_RENDERING</code></td>
+              <td><code>gui.rendering</code></td>
+            </tr>
+            <tr>
               <td><code>WEPWAWET_LOG_LEVEL</code></td>
               <td><code>logging.level</code></td>
             </tr>
@@ -343,7 +359,7 @@ censys = "…"</code></pre>
       </div>
     </main>
     <footer class="site">
-      Wepwawet 1.0.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 1.0.1 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>
