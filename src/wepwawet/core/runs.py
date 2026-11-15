@@ -8,7 +8,7 @@ from collections import OrderedDict
 from collections.abc import Callable
 
 from wepwawet.core.events import EventBus
-from wepwawet.core.history import History
+from wepwawet.core.history import History, HistoryError
 from wepwawet.core.models import RunReport, RunStatus
 from wepwawet.core.pipeline import Pipeline
 
@@ -73,7 +73,11 @@ class RunManager:
     def get(self, run_id: str) -> RunReport | None:
         run = self._runs.get(run_id)
         if run is None and self.history is not None:
-            run = self.history.get(run_id)
+            try:
+                run = self.history.get(run_id)
+            except HistoryError:
+                log.warning("Run %s in the history cannot be read by this version", run_id)
+                raise
         return run
 
     def list(self) -> list[RunReport]:

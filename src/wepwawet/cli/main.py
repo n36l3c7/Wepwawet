@@ -5,6 +5,7 @@ work in the terminal.
 """
 
 import asyncio
+import os
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
@@ -21,6 +22,7 @@ from wepwawet.logging_setup import setup_logging
 from wepwawet.paths import default_paths
 
 if TYPE_CHECKING:
+    from wepwawet.core.benchmark import AnchorResult
     from wepwawet.core.history import History
     from wepwawet.core.models import RunReport
 
@@ -34,6 +36,7 @@ app = typer.Typer(
 console = Console()
 err_console = Console(stderr=True)
 
+MIN_TOKEN_LENGTH = 24
 _STATUS_STYLE = {Status.OK: "[green]ok[/]", Status.WARN: "[yellow]warn[/]", Status.FAIL: "[red]fail[/]"}
 
 
@@ -100,7 +103,10 @@ def serve(
     except ConfigError as exc:
         err_console.print(f"[red]{exc}[/]")
         raise typer.Exit(2) from exc
-    token = new_token()
+    token = os.environ.get("WEPWAWET_TOKEN", "").strip() or new_token()
+    if len(token) < MIN_TOKEN_LENGTH:
+        err_console.print(f"[red]WEPWAWET_TOKEN must be at least {MIN_TOKEN_LENGTH} characters.[/]")
+        raise typer.Exit(2)
     sock = bind_socket(config.server.host, config.server.port)
     console.print(f"Open [bold]{base_url(sock)}/auth?token={token}[/] (Ctrl+C to stop)")
     serve_forever(create_app(config, token), sock)
@@ -402,6 +408,58 @@ def bulk(
     else:
         sys.stdout.buffer.write(body.encode("utf-8"))
         sys.stdout.flush()
+
+
+@app.command()
+def benchmark(
+    anchors: Annotated[int, typer.Option(help="How many RIPE Atlas anchors to locate.")] = 10,
+    max_tests: Annotated[int, typer.Option(help="Measurement tests per anchor (0: passive only).")] = 100,
+    seed: Annotated[int, typer.Option(help="Seed of the anchor sample, for repeatable runs.")] = 1,
+    output: Annotated[Path | None, typer.Option("--output", "-o", help="Per-anchor CSV.")] = None,
+) -> None:
+    """Measure the accuracy on RIPE Atlas anchors, whose positions are public: error per stage."""
+    from wepwawet.core.benchmark import STAGES, fetch_anchors, pick_anchors, results_csv, run_benchmark, summarise
+    from wepwawet.core.context import build_context
+
+    config = _load()
+
+    async def go() -> list["AnchorResult"]:
+        ctx = build_context(config, default_paths())
+        try:
+            available = await fetch_anchors(ctx)
+        finally:
+            await ctx.http.aclose()
+        chosen = pick_anchors(available, anchors, seed)
+        err_console.print(f"{len(available)} anchors available; locating {len(chosen)} (seed {seed})")
+        return await run_benchmark(
+            chosen,
+            lambda address: _locate(config, address, max_tests, quiet=True),
+            lambda message: err_console.print(f"[dim]{escape(message)}[/]"),
+        )
+
+    results = asyncio.run(go())
+    table = Table(show_header=True, header_style="bold", title="Error against the published anchor positions")
+    for column in ("Stage", "Anchors", "Median", "P90", "Truth inside the uncertainty"):
+        table.add_column(column)
+    for row in summarise(results):
+        if row.count:
+            table.add_row(
+                row.stage,
+                str(row.count),
+                f"{row.median_km:,.1f} km",
+                f"{row.p90_km:,.1f} km",
+                f"{(row.coverage or 0) * 100:.0f} %",
+            )
+        else:
+            table.add_row(row.stage, "0", "-", "-", "-")
+    console.print(table)
+    failed = [r for r in results if r.error]
+    if failed:
+        console.print(f"[yellow]{len(failed)} anchors failed: {', '.join(r.anchor.fqdn for r in failed)}[/]")
+    console.print(f"[dim]Stages: {', '.join(STAGES)}. Tests used: {sum(r.tests_used for r in results)}.[/]")
+    if output is not None:
+        output.write_text(results_csv(results), encoding="utf-8")
+        err_console.print(f"Wrote {output}")
 
 
 def run() -> None:

@@ -286,6 +286,14 @@ function Probes({ report }) {
               <td className="border-b border-line-soft px-1 py-1 text-right">
                 {p.max_distance_km === null ? '—' : `${Math.round(p.max_distance_km).toLocaleString('en')} km`}
                 {p.calibrated ? <span className="block text-[10px] text-accent2">calibrated</span> : null}
+                {p.outlier ? (
+                  <span
+                    className="block text-[10px] text-warn"
+                    title="Its RTT is impossible from its declared position"
+                  >
+                    misplaced, ignored
+                  </span>
+                ) : null}
               </td>
             </tr>
           ))}

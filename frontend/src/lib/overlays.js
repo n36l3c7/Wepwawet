@@ -22,7 +22,7 @@ function kindOf(evidence) {
 export function reportPoints(report) {
   if (!report) return []
   return report.evidence
-    .filter((e) => e.point)
+    .filter((e) => e.point && e.kind !== 'negative' && e.source !== 'rtt')
     .map((e, index) => ({
       id: `${e.source}-${index}`,
       kind: kindOf(e),

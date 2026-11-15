@@ -27,7 +27,7 @@ from wepwawet.config import LOOPBACK_HOSTS, Config
 from wepwawet.core.bulk import BulkJob, parse_targets
 from wepwawet.core.events import EventBus
 from wepwawet.core.export import FORMATS, render, summary_csv, target_features
-from wepwawet.core.history import diff_runs
+from wepwawet.core.history import HistoryError, diff_runs
 from wepwawet.core.models import RunReport
 
 
@@ -129,6 +129,10 @@ def create_app(
         lifespan=lifespan,
     )
     app.state.services = svc
+
+    @app.exception_handler(HistoryError)
+    async def unreadable_run(_request: Request, exc: HistoryError) -> JSONResponse:
+        return JSONResponse({"detail": str(exc)}, status_code=410)
 
     @app.middleware("http")
     async def guard(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:

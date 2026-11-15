@@ -22,6 +22,8 @@ from wepwawet.core.models import AnycastInfo, AnycastSite, GeoPoint, ProbeResult
 START_RESOLUTION = 1
 MAX_RESOLUTION = 8
 MAX_CELLS = 15_000
+# A disk smaller than this (an RTT under 10 ms) is trusted even when it conflicts with others.
+TRUSTED_RADIUS_KM = 1000.0
 # A cell is kept if its centre lies within d_max plus this share of the cell's size.
 CELL_MARGIN = 1.05
 
@@ -116,6 +118,44 @@ def _json_safe(geometry: dict[str, object]) -> dict[str, object]:
         return value
 
     return {k: convert(v) for k, v in geometry.items()}
+
+
+def _conflicts(disks: Sequence[Disk], min_separation_km: float) -> dict[str, int]:
+    counts = {d.probe: 0 for d in disks}
+    for i, a in enumerate(disks):
+        for b in disks[i + 1 :]:
+            distance = haversine(a.lat, a.lon, b.lat, b.lon)
+            if distance > a.radius_km + b.radius_km and distance > min_separation_km:
+                counts[a.probe] += 1
+                counts[b.probe] += 1
+    return counts
+
+
+def split_outliers(
+    disks: Sequence[Disk], min_separation_km: float = 500.0, share: float = 0.1
+) -> tuple[list[Disk], list[Disk]]:
+    """Separate probes whose declared position is wrong from the rest.
+
+    A probe placed in the wrong country conflicts with most other probes. Removing the worst
+    probes, at most ``share`` of them, and finding that every conflict disappears means they were
+    misplaced, not that the address is anycast. A probe whose bound is under ``TRUSTED_RADIUS_KM``
+    (an RTT under 10 ms) is never discarded: so fast an answer is strong local evidence, and it
+    is exactly what a real anycast site produces.
+    """
+    kept = list(disks)
+    removed: list[Disk] = []
+    budget = max(1, int(len(disks) * share))
+    while len(removed) < budget:
+        counts = _conflicts(kept, min_separation_km)
+        candidates = [d for d in kept if counts[d.probe] > 0 and d.radius_km >= TRUSTED_RADIUS_KM]
+        if not any(counts.values()) or not candidates:
+            break
+        worst = max(candidates, key=lambda d: counts[d.probe])
+        kept.remove(worst)
+        removed.append(worst)
+    if removed and not any(_conflicts(kept, min_separation_km).values()):
+        return kept, removed
+    return list(disks), []
 
 
 def detect_anycast(disks: Sequence[Disk], min_separation_km: float = 500.0) -> AnycastInfo:

@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Methodology · Wepwawet</title>
+    <meta name="description" content="Wepwawet: measurement-based IP geolocation for Linux." />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site">
+      <a class="brand" href="index.html"><span aria-hidden="true">/\o&gt;</span>wepwawet</a>
+      <nav aria-label="Documentation">
+        <a href="index.html">Overview</a>
+        <a href="installation.html">Installation</a>
+        <a href="usage.html">Usage</a>
+        <a href="configuration.html">Configuration</a>
+        <a href="cli.html">CLI reference</a>
+        <a href="methodology.html" aria-current="page">Methodology</a>
+        <a href="changelog.html">Changelog</a>
+      </nav>
+    </header>
+    <main>
+      <h1>Methodology</h1>
+      <p class="lede">
+        How Wepwawet turns public data and network measurements into an estimate, and where each technique stops being
+        reliable.
+      </p>
+
+      <h2>1. Passive evidence</h2>
+      <p>
+        Before measuring anything, Wepwawet asks the sources that already know something about the address: GeoIP
+        databases (DB-IP Lite, IPinfo Lite, MaxMind GeoLite2, and GeoLite2 through RIPEstat), RIPE IPmap, the routing
+        table (RIPEstat: prefix, origin AS, RIR country), the registration (RDAP), reverse DNS of the address and of its
+        /24 neighbours, PeeringDB (where the origin network is present), Shodan InternetDB, and optionally Shodan and
+        Censys.
+      </p>
+      <p>
+        GeoIP databases are often right for hosting and often wrong for small or re-assigned blocks, and they disagree
+        with each other more often than one expects: the disagreement is reported in kilometres. Registration country is
+        where the holder is registered, not where the address is used. These answers are <em>soft</em> evidence: hints,
+        never limits.
+      </p>
+
+      <h2>2. Distance from delay</h2>
+      <p>
+        A packet cannot travel faster than light in fibre, about 200 km per millisecond one way (two thirds of
+        <i>c</i>). A minimum round-trip time of <i>rtt</i> ms from a probe therefore bounds the target to
+      </p>
+      <pre><code>d_max = rtt / 2 × 200 km</code></pre>
+      <p>
+        The minimum over several packets is used because queueing only ever adds delay. Real paths are longer than the
+        great circle and cross routers, so the true distance is usually well inside the bound: the bound is safe but
+        loose. When the target drops ICMP, the TCP handshake time to port 443 is measured instead.
+      </p>
+      <p>
+        <strong>Calibration (optional).</strong> Constraint-Based Geolocation (Gueye et al., 2006) tightens the bound
+        per probe: each probe pings landmarks of known position (RIPE Atlas anchors) and Wepwawet fits the "bestline",
+        the line <code>rtt = m·d + b</code> that stays below every landmark with the slope at least the physical
+        minimum. Inverted, it bounds the distance more tightly than the speed of light alone.
+      </p>
+
+      <h2>3. The ping campaign</h2>
+      <p>
+        A global sweep pings the target from about 48 Globalping probes on every continent; the fastest probes are near
+        it. A regional zoom then uses about 30 probes in the fastest probe's country and in the countries the passive
+        sources name, which gives bounds of tens of kilometres when a probe is in the same city. Both phases respect a
+        test budget and Globalping's hourly limit.
+      </p>
+
+      <h2>4. The feasible region</h2>
+      <p>
+        Every probe draws a disk of radius <i>d_max</i>; the target is in all of them. The intersection is computed on
+        Uber's H3 hexagonal grid, coarse to fine: start from every resolution-1 cell, keep the cells whose centre is
+        within each disk plus the cell size, replace them with their children, and stop when the region would need more
+        than 15 000 cells or reaches resolution 8 (cells of about 0.7 km²). The region's area is the sum of its cells'
+        areas; its centre is the spherical mean of the cells; the uncertainty radius is the 90th-percentile distance
+        from the centre plus a cell. GeoNames cities above 15 000 inhabitants inside the region are listed and ranked by
+        size and closeness to the centre.
+      </p>
+
+      <h2>5. Anycast</h2>
+      <p>
+        If two probes far apart (more than 500 km) are both so fast that their disks cannot overlap, no single place
+        satisfies both: the address answers from several places. Wepwawet reports the speed-of-light violations, lists
+        the sites (the tightest mutually disjoint disks) and computes the region of the site nearest the fastest probe
+        only.
+      </p>
+      <p>
+        A probe whose declared position is wrong produces the same symptom: it conflicts with nearly every other probe.
+        So before calling an address anycast, Wepwawet removes the probes with the most conflicts, at most 10 % of them;
+        if every conflict then disappears, those probes are reported as misplaced and ignored. A probe answering in
+        under 10 ms is never removed this way: so fast an answer is what a real anycast site produces. In the benchmark,
+        a probe declared in Pretoria answering an anchor in Winterthur in 42 ms was caught like this.
+      </p>
+
+      <h2>6. Traceroutes and router names</h2>
+      <p>
+        The five fastest probes trace the path to the target. Router hostnames often name a place: an operator's own
+        code (<code>ffm-bb2.twelve99.net</code> is Frankfurt), an airport or IATA metro code (<code>fra1</code>,
+        <code>mil04s50</code>), a UN/LOCODE (<code>itmil01</code>) or a city (<code>amsterdam</code>). Operator
+        conventions live in <code>geohint_rules.toml</code>, in the spirit of Hoiho (Luckie et al., 2021). Three-letter
+        tokens are ambiguous, so router words are ignored and every hint is checked against the hop's own RTT: a router
+        2 ms from the probe cannot be 1 000 km away, and such a hint is discarded. Routers inside an exchange point's
+        peering LAN (PeeringDB) are placed at that exchange.
+      </p>
+      <p>
+        The router nearest the target that most paths share is the <strong>convergence</strong> point: with its location
+        and the RTT left from it to the target, it is a strong anchor. Private addresses are never treated as shared,
+        since two <code>10.0.0.1</code> are different routers.
+      </p>
+
+      <h2>7. The access line</h2>
+      <p>
+        The RTT step from the last public router to the target is the access line: under 0.5 ms looks like a data
+        centre, 1 to 3 ms like fibre, 3 to 15 ms like cable or xDSL, more like mobile or fixed wireless (Wang et al.,
+        2011, use the same idea for landmark-based refinement). Every probe's RTT includes this delay, so 80 % of it is
+        removed from every RTT before the region is recomputed; the 20 % margin keeps the region from shrinking past the
+        target when one path had a slower last mile.
+      </p>
+
+      <h2>8. Fusion and confidence</h2>
+      <p>
+        The RTT region is a hard limit. Inside it, every candidate place (the cities in the region and the soft answers
+        that fall in it) is scored by the soft evidence that agrees with it:
+      </p>
+      <pre><code>score(c) = Σ weight(e) · exp(−d(c, e)² / 2σ(e)²)     σ(e) = max(25 km, accuracy of e)</code></pre>
+      <p>
+        The best candidate is the estimate, except when the region's radius is 50 km or less: then the measurements are
+        sharper than any GeoIP answer (which is a city centre), so the region's centre is kept and the best candidate
+        only names the place. Soft answers outside the region are contradicted by physics, dropped and listed as ruled
+        out. Confidence starts from the area of the region (100 km² gives about 85, 10 000 km² about 55), gains 6 points
+        per independent agreeing source (up to 4), is capped at 30 for anycast, and loses points for mobile (15), VPN
+        (10), CDN (10) and hosting (5) networks. Without measurements it starts at 10 and never exceeds 38.
+      </p>
+
+      <h2>9. Accuracy</h2>
+      <p>
+        <code>wepwawet benchmark</code> locates RIPE Atlas anchors, whose positions RIPE NCC publishes, and reports for
+        each stage (passive, after the pings, after the traceroutes, final) the median and 90th-percentile error and how
+        often the truth fell inside the stated uncertainty. Anchors live in data centres and well-connected networks,
+        where GeoIP is good and probes are near; residential and mobile addresses are harder, so treat the benchmark as
+        a best case. RIPE IPmap is built partly on RIPE Atlas data and knows the anchors well, so passive results on
+        anchors are flattering; run the benchmark with <code>[providers.ipmap] enabled = false</code> for a fairer
+        passive figure.
+      </p>
+
+      <p>Passive sources only, 20 anchors (seed 1), November 2026:</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Sources</th>
+              <th>Median error</th>
+              <th>90th percentile</th>
+              <th>Truth inside the uncertainty</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>All passive sources</td>
+              <td>3.6 km</td>
+              <td>13 km</td>
+              <td>95 %</td>
+            </tr>
+            <tr>
+              <td>Without RIPE IPmap</td>
+              <td>5.8 km</td>
+              <td>180 km</td>
+              <td>75 %</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        With measurements, two anchors at 84 Globalping tests each: Singapore was located 0.6 km from its published
+        position (the fastest probe answered in 0.5 ms), Winterthur 14 km; the truth was inside the stated uncertainty
+        at every stage. Two anchors are an example, not a statistic.
+      </p>
+
+      <h2>10. Limits</h2>
+      <ul>
+        <li>
+          <strong>Residential</strong>: the realistic ceiling is the provider's point of presence or BNG. The
+          subscriber's address is only in the provider's records.
+        </li>
+        <li>
+          <strong>Mobile and CGNAT</strong>: traffic leaves through a gateway that can be hundreds of kilometres from
+          the user.
+        </li>
+        <li><strong>VPN, Tor, proxies, hosting</strong>: the result is the exit server.</li>
+        <li><strong>Anycast</strong>: there is no single location.</li>
+        <li>
+          <strong>MPLS</strong> hides routers; <strong>asymmetric routing</strong> makes the return path differ from the
+          forward one; <strong>ICMP filtering</strong> leaves holes in traceroutes. All three widen the uncertainty, and
+          Wepwawet flags them.
+        </li>
+        <li>Probe positions are self-declared or geolocated by the platforms and can be wrong by a few kilometres.</li>
+      </ul>
+
+      <h2>References</h2>
+      <ul>
+        <li>
+          B. Gueye, A. Ziviani, M. Crovella, S. Fdida. Constraint-Based Geolocation of Internet Hosts. IEEE/ACM
+          Transactions on Networking, 2006.
+        </li>
+        <li>E. Katz-Bassett et al. Towards IP Geolocation Using Delay and Topology Measurements. IMC 2006.</li>
+        <li>
+          Y. Wang, D. Burgener, M. Flores, A. Kuzmanovic, C. Huang. Towards Street-Level Client-Independent IP
+          Geolocation. NSDI 2011.
+        </li>
+        <li>
+          M. Luckie, B. Huffaker, A. Marder, Z. Bischof, M. Fletcher, k. claffy. Learning to Extract Geographic
+          Information from Internet Router Hostnames. CoNEXT 2021.
+        </li>
+      </ul>
+    </main>
+    <footer class="site">
+      Wepwawet 1.0.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+    </footer>
+  </body>
+</html>

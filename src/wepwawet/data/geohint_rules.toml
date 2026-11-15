@@ -166,3 +166,21 @@ k = "Köln, DE"
 l = "Leipzig, DE"
 n = "Nürnberg, DE"
 ha = "Hannover, DE"
+
+[[rule]]
+operator = "Init7"
+domain = "init7.net"
+pattern = '\.(?P<code>[a-z]{3})\d+\.(?:edge|core)\.init7\.net$'
+kind = "map"
+[rule.codes]
+win = "Winterthur, CH"
+zrh = "Zurich, CH"
+gva = "Geneva, CH"
+bsl = "Basel, CH"
+brn = "Bern, CH"
+lau = "Lausanne, CH"
+stg = "Sankt Gallen, CH"
+luz = "Lucerne, CH"
+lug = "Lugano, CH"
+fra = "Frankfurt am Main, DE"
+ams = "Amsterdam, NL"

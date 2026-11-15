@@ -116,3 +116,22 @@ def test_area_confidence_decreases_with_area() -> None:
     values = [area_confidence(a) for a in (100, 10_000, 1_000_000)]
     assert values == sorted(values, reverse=True)
     assert area_confidence(0) == 0
+
+
+def test_a_misplaced_probe_is_not_anycast() -> None:
+    from wepwawet.core.multilateration import split_outliers
+
+    # A probe declared in Pretoria whose 42 ms RTT only fits a European position.
+    disks = [*disks_for(MILAN), Disk("pretoria", -25.86, 28.19, 4230)]
+    kept, outliers = split_outliers(disks)
+    assert [d.probe for d in outliers] == ["pretoria"]
+    assert not detect_anycast(kept).detected
+
+
+def test_fast_far_probes_stay_anycast() -> None:
+    from wepwawet.core.multilateration import split_outliers
+
+    # Sydney answers in 3 ms: too fast to be a misplaced probe, so this is a second site.
+    disks = [*disks_for(MILAN), Disk("syd", -33.87, 151.21, 300)]
+    kept, outliers = split_outliers(disks)
+    assert outliers == [] and detect_anycast(kept).detected

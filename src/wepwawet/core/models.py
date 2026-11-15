@@ -156,6 +156,8 @@ class ProbeResult(_Model):
     packets: int = 0
     max_distance_km: float | None = None
     calibrated: bool = False
+    # The RTT is impossible from the probe's declared position: the probe is misplaced and ignored.
+    outlier: bool = False
 
 
 class CandidateCity(_Model):
@@ -248,6 +250,15 @@ class AccessDelay(_Model):
     paths: int
 
 
+class StageEstimate(_Model):
+    """The estimate as it stood after one stage, so the benchmark can show what each stage adds."""
+
+    stage: str  # "passive", "pings", "traceroutes", "final"
+    location: GeoPoint
+    uncertainty_km: float
+    confidence: int
+
+
 class RunStatus(StrEnum):
     RUNNING = "running"
     DONE = "done"
@@ -273,7 +284,21 @@ class TargetReport(BaseModel):
     convergence: Convergence | None = None
     access: AccessDelay | None = None
     tests_used: int = 0  # measurement tests (or credits) this address cost
+    stages: list[StageEstimate] = Field(default_factory=list)
     estimate: Estimate | None = None
+
+    def record_stage(self, stage: str, estimate: Estimate | None) -> None:
+        if estimate is None:
+            return
+        self.stages = [s for s in self.stages if s.stage != stage]
+        self.stages.append(
+            StageEstimate(
+                stage=stage,
+                location=estimate.location,
+                uncertainty_km=estimate.uncertainty_km,
+                confidence=estimate.confidence,
+            )
+        )
 
 
 class RunReport(BaseModel):

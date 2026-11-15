@@ -5,6 +5,9 @@ RIPE IPmap, router names, convergence, facilities, registration) ranks the place
 Soft answers that fall outside the region are contradicted by physics and are dropped, with a
 note saying so.
 
+When the region is small (radius up to 50 km), its centre is kept as the position and the best
+candidate only names the place: GeoIP answers are city centres, coarser than such a measurement.
+
 Scoring: every candidate place (the cities in the region, and each soft answer that lies in it)
 gets ``sum(weight × exp(-d² / 2σ²))`` over the soft evidence, where ``d`` is the distance from
 the candidate to the answer and ``σ`` the answer's own accuracy (at least 25 km). The best
@@ -28,6 +31,8 @@ from wepwawet.core.models import (
 from wepwawet.core.multilateration import area_confidence
 
 MIN_SIGMA_KM = 25.0
+# Below this radius the RTT region is more precise than GeoIP-style answers, which are city centres.
+PRECISE_REGION_KM = 50.0
 AGREEMENT_KM = 60.0
 # Weight of each kind of soft answer when the provider gave none of its own.
 SOURCE_WEIGHT = {
@@ -97,7 +102,8 @@ def fuse(report: TargetReport) -> Estimate | None:
     located = soft_points(report)
     # Physics overrules databases: soft answers outside the RTT region are dropped.
     kept = [e for e in located if e.point is not None and _inside(e.point, region)]
-    dropped = [e for e in located if e not in kept]
+    # A facility of the origin network far away is not a claim about this address: ignore it quietly.
+    dropped = [e for e in located if e not in kept and e.source != "peeringdb"]
     report.evidence = [e for e in report.evidence if e.source != "fusion"]
     for item in dropped:
         where = ", ".join(p for p in (item.city, item.country) if p) or "elsewhere"
@@ -118,6 +124,10 @@ def fuse(report: TargetReport) -> Estimate | None:
     best, best_score = scored[0]
     if region is not None and best_score == 0:
         best = next((c for c, _ in scored if c.origin == "city"), Candidate(None, None, region.centroid, "centroid"))
+    if region is not None and region.radius_km <= PRECISE_REGION_KM:
+        # The measurements are sharper than any soft answer (often a city centre): keep their centre,
+        # and let the best candidate only name the place.
+        best = Candidate(best.name, best.country, region.centroid, "centroid")
 
     supporting = [
         e
@@ -188,7 +198,10 @@ def explain(report: TargetReport, supporting: list[Evidence], dropped: list[Evid
         lines.append(f"{conv.paths} of {conv.of} traceroutes meet at {conv.hostname or conv.address}{where}.")
     if report.access is not None:
         lines.append(f"The last mile adds about {report.access.delay_ms:.1f} ms ({report.access.technology}).")
-    agreeing = [e.label or e.source for e in supporting if e.source != "traceroute"]
+    agreeing = [e.label or e.source for e in supporting if e.source not in ("traceroute", "peeringdb")]
+    facilities = sum(1 for e in supporting if e.source == "peeringdb")
+    if facilities:
+        agreeing.append(f"{facilities} data centre{'s' if facilities != 1 else ''} of the origin network (PeeringDB)")
     if agreeing:
         lines.append(f"Agreeing nearby: {', '.join(dict.fromkeys(agreeing))}.")
     for item in dropped[:3]:

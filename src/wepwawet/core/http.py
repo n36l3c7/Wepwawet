@@ -11,6 +11,9 @@ from wepwawet import __version__
 from wepwawet.core.cache import TTLCache
 
 USER_AGENT = f"Wepwawet/{__version__} (+https://github.com/n36l3c7/Wepwawet)"
+RATE_LIMIT_SOURCE = "rate-limits"
+DEFAULT_RATE_LIMIT_SECONDS = 60.0
+MAX_RATE_LIMIT_SECONDS = 3600.0
 
 
 class ProviderError(Exception):
@@ -77,6 +80,18 @@ class HttpClient:
     def raw(self) -> httpx.AsyncClient:
         return self._client
 
+    def _check_rate_limit(self, source: str) -> None:
+        """Refuse early while a provider's last 429 asked us to wait, even across runs."""
+        entry = self._cache.get(RATE_LIMIT_SOURCE, source)
+        if entry and entry.get("until", 0) > time.time():
+            wait = entry["until"] - time.time()
+            raise ProviderError(source, f"rate limited: retry in {wait / 60:.0f} min", status=429, retry_after=wait)
+
+    def _remember_rate_limit(self, source: str, retry_after: float | None) -> None:
+        wait = retry_after if retry_after and retry_after > 0 else DEFAULT_RATE_LIMIT_SECONDS
+        wait = min(wait, MAX_RATE_LIMIT_SECONDS)
+        self._cache.set(RATE_LIMIT_SOURCE, source, {"until": time.time() + wait}, max(1, int(wait)))
+
     def configure_pacing(self, source: str, interval: float, concurrency: int = 1) -> None:
         """Set the pace of ``source`` once; later calls keep the first setting."""
         self._pacing.setdefault(source, Pacer(interval=interval, concurrency=concurrency))
@@ -101,6 +116,7 @@ class HttpClient:
         ok_statuses: tuple[int, ...] = (200,),
     ) -> tuple[int, Any]:
         """Uncached request; returns ``(status, parsed JSON or None)``. Raises ``ProviderError`` on failure."""
+        self._check_rate_limit(source)
         retries = self._retries if method == "GET" else 0
         for attempt in range(retries + 1):
             async with self.pacer(source):
@@ -122,6 +138,8 @@ class HttpClient:
             break
         if response.status_code not in ok_statuses:
             retry_after = _retry_after(response)
+            if response.status_code == 429:
+                self._remember_rate_limit(source, retry_after)
             detail = _error_detail(response)
             raise ProviderError(
                 source,

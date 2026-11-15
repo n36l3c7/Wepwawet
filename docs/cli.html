@@ -17,6 +17,7 @@
         <a href="usage.html">Usage</a>
         <a href="configuration.html">Configuration</a>
         <a href="cli.html" aria-current="page">CLI reference</a>
+        <a href="methodology.html">Methodology</a>
         <a href="changelog.html">Changelog</a>
       </nav>
     </header>
@@ -159,8 +160,42 @@
         replaces a working database.
       </p>
 
+      <h2><code>wepwawet benchmark</code></h2>
+      <p>Locate RIPE Atlas anchors and report the error per stage against their published positions.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Option</th>
+              <th>Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>--anchors N</code></td>
+              <td>How many anchors (default 10), one per country first.</td>
+            </tr>
+            <tr>
+              <td><code>--max-tests N</code></td>
+              <td>Tests per anchor (default 100); <code>0</code> for passive only.</td>
+            </tr>
+            <tr>
+              <td><code>--seed N</code></td>
+              <td>Seed of the sample, for repeatable runs.</td>
+            </tr>
+            <tr>
+              <td><code>--output FILE</code></td>
+              <td>Per-anchor CSV with the error of every stage.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
       <h2><code>wepwawet serve</code></h2>
-      <p>Start only the local server and print the address to open, including the session token.</p>
+      <p>
+        Start only the local server and print the address to open, including the session token. The token is new at
+        every start unless <code>WEPWAWET_TOKEN</code> sets one (24 characters or more), for scripts that call the API.
+      </p>
       <div class="table-wrap">
         <table>
           <thead>
@@ -302,7 +337,7 @@
       </div>
     </main>
     <footer class="site">
-      Wepwawet 0.5.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 1.0.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

@@ -17,7 +17,7 @@ Wepwawet is a personal desktop tool:
 
 - The local server listens on `127.0.0.1` by default and refuses other addresses unless
   `server.allow_remote = true` is set.
-- Each start creates a random session token. The window receives it once and keeps it in an
+- Each start creates a random session token (`wepwawet serve` accepts a fixed one in `WEPWAWET_TOKEN`). The window receives it once and keeps it in an
   `HttpOnly`, `SameSite=Strict` cookie; every API call needs it.
 - Requests whose `Host` header is not a loopback name are rejected, which blocks DNS-rebinding pages.
 - The interface runs under a Content Security Policy that allows scripts from the application only.

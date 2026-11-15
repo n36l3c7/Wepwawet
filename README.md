@@ -8,11 +8,11 @@ Measurement-based IP geolocation for Linux: passive evidence plus ping and trace
 
 **Documentation: <https://n36l3c7.github.io/Wepwawet/>**
 
-![Wepwawet locating 193.0.6.139](docs/img/main-window.png)
+![Wepwawet locating 77.109.180.62, a RIPE Atlas anchor in Winterthur: the RTT region over Zurich, the probes, the traceroutes and the estimate with its reasons](docs/img/main-window.png)
 
-> **Status: v0.5.0.** Passive sources, about 80 probes, a feasible region, traceroutes, and one fused
-> estimate with a confidence and its reasons; history with diff, export and bulk mode. v1.0.0 adds the
-> accuracy benchmark and hardening; see [Roadmap](#roadmap).
+> **v1.0.0.** Passive sources, about 80 probes, a feasible region, traceroutes read router by router,
+> and one fused estimate with its uncertainty, confidence and reasons; history with diff, export, bulk mode
+> and an accuracy benchmark. How it works, and where it stops: [Methodology](https://n36l3c7.github.io/Wepwawet/methodology.html).
 
 ## What it does
 
@@ -52,17 +52,17 @@ Download the package for your distribution from the
 
 ```sh
 # Debian, Ubuntu, Kali
-sudo apt install ./wepwawet_0.5.0-1_amd64.deb
+sudo apt install ./wepwawet_1.0.0-1_amd64.deb
 
 # Fedora
-sudo dnf install ./wepwawet-0.5.0-1.x86_64.rpm
+sudo dnf install ./wepwawet-1.0.0-1.x86_64.rpm
 
 # Arch Linux
-sudo pacman -U wepwawet-0.5.0-1-x86_64.pkg.tar.zst
+sudo pacman -U wepwawet-1.0.0-1-x86_64.pkg.tar.zst
 
 # Any distribution: AppImage (needs libfuse2, or run it with --appimage-extract-and-run)
-chmod +x Wepwawet-0.5.0-x86_64.AppImage
-./Wepwawet-0.5.0-x86_64.AppImage
+chmod +x Wepwawet-1.0.0-x86_64.AppImage
+./Wepwawet-1.0.0-x86_64.AppImage
 ```
 
 The packages install the system libraries Qt needs and recommend `mtr` and `traceroute` for measurements
@@ -141,6 +141,7 @@ what that means for the answer.
 | `wepwawet locate TARGET [-f FORMAT] [-o FILE] [--passive]` | Locate an IP address or hostname; print the evidence, or export it (`json`, `geojson`, `kml`, `md`, `csv`). |
 | `wepwawet history list\|show\|diff\|export` | Past runs: list them, show one, compare two, export one. |
 | `wepwawet bulk FILE [--max-tests N] [-o results.csv]` | Locate a list of targets under one test budget; print a summary CSV. |
+| `wepwawet benchmark [--anchors N] [--max-tests N]` | Accuracy on RIPE Atlas anchors: error per stage. |
 | `wepwawet providers` | List the sources and whether each can run now. |
 | `wepwawet data update [--only dbip\|ipinfo\|geolite\|geonames\|places]` | Download the GeoIP databases, the GeoNames cities and the place codes. `data status` lists the GeoIP databases. |
 | `wepwawet serve [--host H] [--port P]` | Start only the local server and print the address to open. |
@@ -212,6 +213,7 @@ censys = "..."
 | `WEPWAWET_HOST`, `WEPWAWET_PORT` | `server.host`, `server.port` |
 | `WEPWAWET_BASEMAP` | `map.basemap` |
 | `WEPWAWET_LOG_LEVEL` | `logging.level` |
+| `WEPWAWET_TOKEN` | Fixed session token for `wepwawet serve` (24+ characters) |
 
 Files: configuration in `~/.config/wepwawet/`, history and logs in `~/.local/share/wepwawet/`, the cache in
 `~/.cache/wepwawet/` (the `XDG_*` variables are honoured). Secrets are never written to the log.
@@ -219,6 +221,29 @@ Files: configuration in `~/.config/wepwawet/`, history and logs in `~/.local/sha
 The online base map uses [CARTO](https://carto.com/basemaps) tiles built from OpenStreetMap data, under
 CARTO's terms. Switch to the offline map (button on the map, or `basemap = "offline"`) to make no tile
 requests at all.
+
+## Accuracy
+
+`wepwawet benchmark` locates RIPE Atlas anchors, whose positions are public, and reports the error of each
+stage. Passive sources only, 20 anchors (seed 1), November 2026:
+
+| Sources | Median error | 90th percentile | Truth inside the stated uncertainty |
+|---|---|---|---|
+| All passive sources | 3.6 km | 13 km | 95 % |
+| Without RIPE IPmap | 5.8 km | 180 km | 75 % |
+
+Read these as a best case. Anchors sit in data centres where GeoIP is good, and RIPE IPmap is built partly
+on RIPE Atlas data, so it knows the anchors well; the second row is the fairer passive figure. Residential
+and mobile addresses are harder (see below).
+
+With measurements (two anchors, 84 Globalping tests each): the anchor in Singapore was located 0.6 km from
+its published position (fastest probe 0.5 ms away), the one in Winterthur 14 km away; the true position
+was inside the stated uncertainty at every stage. Two anchors are an example, not a statistic: run the
+benchmark yourself, with a Globalping token for larger samples:
+
+```sh
+wepwawet benchmark --anchors 10 --max-tests 100 -o benchmark.csv
+```
 
 ## Known limits
 
@@ -237,7 +262,8 @@ requests at all.
 | 0.3.0 | Measurement providers, two-stage ping campaign, multilateration, anycast detection (done) |
 | 0.4.0 | Traceroutes, location hints from router names, IXPs, path convergence (done) |
 | 0.5.0 | Evidence fusion and confidence, history and diff, export, bulk mode (done) |
-| 1.0.0 | Accuracy benchmark, hardening, complete documentation |
+| 1.0.0 | Accuracy benchmark, hardening, complete documentation (done) |
+| later | Landmark-based refinement (street-level, experimental) |
 
 ## Development
 

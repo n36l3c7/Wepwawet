@@ -15,6 +15,7 @@ import ipaddress
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
+from wepwawet.core.fusion import fuse
 from wepwawet.core.geo import Bestline, fit_bestline, haversine, sol_max_distance_km
 from wepwawet.core.geohints import load_hint_data
 from wepwawet.core.http import ProviderError
@@ -34,6 +35,7 @@ from wepwawet.core.multilateration import (
     detect_anycast,
     disks_from,
     region_and_cells,
+    split_outliers,
 )
 from wepwawet.core.traceroutes import analyse_traces, estimate_access, find_convergence
 from wepwawet.data.gazetteer import FILE_NAME, candidate_cities, load_cities
@@ -255,11 +257,15 @@ class Campaign:
             self._finish_geometry(report)
             progress()
 
+        report.record_stage("pings", report.estimate if report.region else None)
+
         # 4. Traceroutes from the fastest probes: hop locations, convergence, access delay.
         tracers = [p for p in usable if p.supports_traceroute]
         if tracers and cfg.traceroute_probes:
             await self._traceroutes(report, tracers, state)
             self._finish_geometry(report)
+            if report.traceroutes:
+                report.record_stage("traceroutes", fuse(report))
             progress()
         self._log("info", "measure", f"Measurements used {state.tests_used} tests")
 
@@ -506,11 +512,13 @@ class Campaign:
         disks = disks_from(probes)
         if not disks:
             return
+        disks, outliers = split_outliers(disks)
+        self._mark_outliers(report, {d.probe for d in outliers})
         anycast = detect_anycast(disks)
         report.anycast = anycast
         region_input = consistent_subset(disks) if anycast.detected else disks
         result = region_and_cells(region_input)
-        report.evidence = [e for e in report.evidence if e.source != "rtt"]
+        report.evidence = [e for e in report.evidence if e.source != "rtt" or e.label == "Misplaced probes"]
         if result is None:
             report.region = None
             return
@@ -520,6 +528,28 @@ class Campaign:
             region = region.model_copy(update={"candidates": tuple(candidate_cities(cities, region, cells))})
         report.region = region
         self._add_evidence(report, region, anycast.detected, len(disks), correction)
+
+    def _mark_outliers(self, report: TargetReport, keys: set[str]) -> None:
+        report.probes = [
+            r.model_copy(update={"outlier": f"{r.probe.provider}:{r.probe.probe_id}" in keys}) for r in report.probes
+        ]
+        report.evidence = [e for e in report.evidence if not (e.source == "rtt" and e.label == "Misplaced probes")]
+        if keys:
+            names = [
+                ", ".join(p for p in (r.probe.city, r.probe.country) if p) or r.probe.probe_id
+                for r in report.probes
+                if r.outlier
+            ]
+            report.evidence.append(
+                Evidence(
+                    source="rtt",
+                    kind=EvidenceKind.INFO,
+                    label="Misplaced probes",
+                    summary=f"Ignored {len(keys)} probe{'s' if len(keys) != 1 else ''} whose RTT is impossible from "
+                    f"its declared position ({'; '.join(names[:5])})",
+                    details={"probes": sorted(keys)},
+                )
+            )
 
     def _access_correction(self, report: TargetReport) -> float:
         """RTT to remove from every probe: most of the access delay, which every path includes."""

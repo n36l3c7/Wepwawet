@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from pydantic import ValidationError
 from sqlalchemy import Column, Float, Integer, MetaData, String, Table, Text, create_engine, delete, desc, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import StaticPool
@@ -28,6 +29,10 @@ _runs = Table(
     Column("confidence", Integer),
     Column("report", Text, nullable=False),
 )
+
+
+class HistoryError(Exception):
+    """A saved run cannot be read (for example, written by another version)."""
 
 
 @dataclass(frozen=True)
@@ -101,9 +106,17 @@ class History:
         ]
 
     def get(self, run_id: str) -> RunReport | None:
+        """The saved run, or ``None``. Raises ``HistoryError`` for a run another version cannot read."""
         with self._engine.connect() as conn:
             raw = conn.execute(select(_runs.c.report).where(_runs.c.id == run_id)).scalar_one_or_none()
-        return RunReport.model_validate_json(raw) if raw else None
+        if not raw:
+            return None
+        try:
+            return RunReport.model_validate_json(raw)
+        except ValidationError as exc:
+            raise HistoryError(
+                f"Run {run_id} was saved by a different version of Wepwawet and cannot be read by this one."
+            ) from exc
 
     def delete(self, run_id: str) -> bool:
         with self._engine.begin() as conn:

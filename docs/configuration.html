@@ -17,6 +17,7 @@
         <a href="usage.html">Usage</a>
         <a href="configuration.html" aria-current="page">Configuration</a>
         <a href="cli.html">CLI reference</a>
+        <a href="methodology.html">Methodology</a>
         <a href="changelog.html">Changelog</a>
       </nav>
     </header>
@@ -270,6 +271,10 @@ censys = "…"</code></pre>
         </table>
       </div>
       <p>Keys are never logged, never shown in the interface and never stored in the cache.</p>
+      <p>
+        When a source answers "too many requests", Wepwawet remembers how long it asked to wait (up to an hour) and does
+        not call it again before then, even after a restart.
+      </p>
 
       <h2>Environment variables</h2>
       <div class="table-wrap">
@@ -296,6 +301,13 @@ censys = "…"</code></pre>
             <tr>
               <td><code>WEPWAWET_LOG_LEVEL</code></td>
               <td><code>logging.level</code></td>
+            </tr>
+            <tr>
+              <td><code>WEPWAWET_TOKEN</code></td>
+              <td>
+                Fixed session token for <code>wepwawet serve</code> (24+ characters); otherwise a new one at every
+                start.
+              </td>
             </tr>
           </tbody>
         </table>
@@ -331,7 +343,7 @@ censys = "…"</code></pre>
       </div>
     </main>
     <footer class="site">
-      Wepwawet 0.5.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 1.0.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

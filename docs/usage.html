@@ -17,6 +17,7 @@
         <a href="usage.html" aria-current="page">Usage</a>
         <a href="configuration.html">Configuration</a>
         <a href="cli.html">CLI reference</a>
+        <a href="methodology.html">Methodology</a>
         <a href="changelog.html">Changelog</a>
       </nav>
     </header>
@@ -27,7 +28,12 @@
       </p>
 
       <h2>Locate an address</h2>
-      <img src="img/main-window.png" alt="Wepwawet locating 193.0.6.139." width="1416" height="808" />
+      <img
+        src="img/main-window.png"
+        alt="Wepwawet locating 77.109.180.62, a RIPE Atlas anchor in Winterthur."
+        width="1416"
+        height="808"
+      />
       <ol>
         <li>
           Type an IPv4 or IPv6 address, or a hostname, in the top bar and press <strong>Run</strong>. A hostname is
@@ -172,6 +178,16 @@ wepwawet history diff OLD_RUN NEW_RUN</code></pre>
       </p>
       <pre><code>wepwawet bulk targets.txt --max-tests 500 -o results.csv</code></pre>
 
+      <h2>Accuracy benchmark</h2>
+      <p>To see how well Wepwawet does, locate RIPE Atlas anchors, whose positions are public:</p>
+      <pre><code>wepwawet benchmark --anchors 10 --max-tests 100 -o benchmark.csv
+wepwawet benchmark --anchors 30 --max-tests 0     # passive sources only, no tests</code></pre>
+      <p>
+        It prints, for each stage, the median and 90th-percentile error and how often the true position was inside the
+        stated uncertainty. Ten anchors with measurements use about 830 Globalping tests: with the anonymous limit of
+        250 an hour, run it with a token or over a few hours.
+      </p>
+
       <h2>Sources</h2>
       <div class="table-wrap">
         <table>
@@ -280,7 +296,7 @@ wepwawet serve            # server only; open the printed address yourself</code
       </p>
     </main>
     <footer class="site">
-      Wepwawet 0.5.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 1.0.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

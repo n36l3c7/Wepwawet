@@ -3,6 +3,7 @@
 import asyncio
 import json
 import time
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -134,7 +135,11 @@ def finished_run(run_id: str, city: str = "Milan", lat: float = 45.46, path: tup
             hops=tuple(HopReport(ttl=i + 1, address=a, min_rtt=float(i)) for i, a in enumerate(path)),
         )
     ]
-    return RunReport(id=run_id, query="k.example", status=RunStatus.DONE, targets=[report])
+    # Distinct start times (a later id starts later), so the history order never depends on the clock.
+    started = datetime(2026, 11, 1, 12, 0, tzinfo=UTC) + timedelta(
+        minutes=int(run_id[1:]) if run_id[1:].isdigit() else 0
+    )
+    return RunReport(id=run_id, query="k.example", status=RunStatus.DONE, targets=[report], started_at=started)
 
 
 def test_history_round_trip_and_listing() -> None:
@@ -260,3 +265,34 @@ def test_history_export_and_bulk_routes(app_paths: AppPaths, tmp_path: Path) -> 
         assert summary.status_code == 200 and "private" in summary.text
         assert client.post("/api/bulk", json={"queries": ["# only a comment"]}).status_code == 422
         assert client.delete("/api/history/r1").json() == {"deleted": True}
+
+
+def test_unreadable_history_run_is_a_clear_error() -> None:
+    from sqlalchemy import update
+
+    from wepwawet.core.history import HistoryError, _runs
+
+    history = History.in_memory()
+    history.save(finished_run("r1"))
+    with history._engine.begin() as conn:  # noqa: SLF001 - simulate a run written by another version
+        conn.execute(update(_runs).values(report='{"id": "r1", "query": "q", "from_the_future": 1}'))
+    with pytest.raises(HistoryError, match="different version"):
+        history.get("r1")
+
+
+def test_facilities_are_counted_not_listed() -> None:
+    report = measured_report()
+    for i in range(6):
+        report.evidence.append(soft("peeringdb", f"DC{i}", "Milan", 45.46, 9.19, None))  # type: ignore[attr-defined]
+    estimate = fuse(report)  # type: ignore[arg-type]
+    assert estimate is not None
+    text = " ".join(estimate.explanation)
+    assert "6 data centres of the origin network" in text and "DC3" not in text
+
+
+def test_far_facilities_are_not_ruled_out_answers() -> None:
+    report = measured_report()
+    report.evidence.append(soft("peeringdb", "NIKHEF", "Amsterdam", 52.36, 4.95, None))  # type: ignore[attr-defined]
+    estimate = fuse(report)  # type: ignore[arg-type]
+    assert estimate is not None and "NIKHEF" not in " ".join(estimate.explanation)
+    assert not any("NIKHEF" in e.summary for e in report.evidence if e.kind is EvidenceKind.NEGATIVE)  # type: ignore[attr-defined]

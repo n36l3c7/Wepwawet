@@ -21,6 +21,8 @@ from wepwawet.providers.base import EnrichmentProvider, EnrichmentResult, Provid
 log = logging.getLogger(__name__)
 
 Emit = Callable[[str, dict[str, Any]], None]
+# A source that takes longer is reported as failed; the run goes on with the others.
+PROVIDER_TIMEOUT_SECONDS = 90.0
 ANYCAST_CAVEAT = (
     "Anycast: the address answers from several places at once. The region shown is the site nearest to "
     "the fastest probe, not a single location."
@@ -78,6 +80,9 @@ class Pipeline:
         try:
             for index, report in enumerate(run.targets):
                 await self._enrich(run, index, report)
+                passive = fuse(report)
+                report.record_stage("passive", passive)
+                report.estimate = passive
                 if self._campaign is not None:
                     await self._measure(run, index, report, self._campaign)
                 self._finalise(run, index, report)
@@ -115,6 +120,7 @@ class Pipeline:
     def _finalise(self, run: RunReport, index: int, report: TargetReport) -> None:
         """Fuse every piece of evidence into the final estimate."""
         estimate = fuse(report)
+        report.record_stage("final", estimate)
         if estimate is not None:
             report.estimate = estimate
             where = ", ".join(p for p in (estimate.city, estimate.country) if p) or "the region centre"
@@ -143,7 +149,10 @@ class Pipeline:
             return ProviderStatus(provider=provider.name, status="skipped", message=reason), None
         started = time.monotonic()
         try:
-            result = await provider.enrich(report, self._ctx)
+            try:
+                result = await asyncio.wait_for(provider.enrich(report, self._ctx), PROVIDER_TIMEOUT_SECONDS)
+            except TimeoutError as exc:
+                raise ProviderError(provider.name, f"no answer within {PROVIDER_TIMEOUT_SECONDS:.0f} s") from exc
         except ProviderError as exc:
             elapsed = (time.monotonic() - started) * 1000
             self._log(run, "error", provider.name, exc.message)

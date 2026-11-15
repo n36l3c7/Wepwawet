@@ -7,6 +7,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-15
+
+The first stable release: the CLI, the configuration and the API are now covered by Semantic Versioning.
+
+### Added
+
+- `wepwawet benchmark`: accuracy on RIPE Atlas anchors, with the median and 90th-percentile error of
+  every stage (passive, pings, traceroutes, final) and the share of anchors inside the stated
+  uncertainty; per-anchor CSV.
+- Every report keeps the estimate after each stage (`stages`).
+- Persistent rate limits: after a 429 a source is not called again before the time it asked for (up
+  to an hour), across restarts.
+- A 90-second limit per passive source; a slow source is reported and the run goes on.
+- `WEPWAWET_TOKEN` for a fixed `wepwawet serve` session token (24 characters or more).
+- Methodology page in the documentation, with the techniques, their formulas, limits and references.
+- Operator rule for Init7 router names (Swiss city codes such as `win` for Winterthur).
+
+### Changed
+
+- Fusion keeps the centre of the RTT region when its radius is 50 km or less, and uses the best
+  candidate only to name the place: GeoIP answers are city centres, coarser than such a measurement
+  (on a Singapore anchor the error went from 17.6 km to 0.6 km).
+
+### Fixed
+
+- A measurement probe whose declared position is wrong (its RTT is impossible from there) no longer
+  makes the address look anycast: up to 10 % of the probes that alone cause every speed-of-light
+  conflict are excluded and reported; probes answering in under 10 ms are always trusted. Ruled-out
+  answers are no longer drawn on the map as passive answers.
+- A history run written by another version gives a clear message (HTTP 410) instead of a server error.
+- The explanation counts the origin network's data centres instead of listing them, and far data
+  centres are no longer reported as ruled-out answers.
+
 ## [0.5.0] - 2026-11-15
 
 One answer, with its reasons, kept and shareable.
@@ -129,7 +162,8 @@ First release: the application, without geolocation yet.
   supported distribution.
 - Documentation site in `docs/`.
 
-[Unreleased]: https://github.com/n36l3c7/Wepwawet/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/n36l3c7/Wepwawet/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/n36l3c7/Wepwawet/compare/v0.5.0...v1.0.0
 [0.5.0]: https://github.com/n36l3c7/Wepwawet/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/n36l3c7/Wepwawet/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/n36l3c7/Wepwawet/compare/v0.2.0...v0.3.0
