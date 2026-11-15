@@ -1,4 +1,5 @@
-"""Configuration: defaults, overridden by ``config.toml``, overridden by environment variables.
+"""Configuration: defaults, overridden by ``config.toml``, then by ``settings.toml`` (written by the
+settings panel), then by environment variables.
 
 Environment variables:
 
@@ -18,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 from wepwawet.paths import AppPaths, default_paths
 
+SETTINGS_FILE = "settings.toml"
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 
 
@@ -150,23 +152,38 @@ def config_file_path(paths: AppPaths, environ: dict[str, str]) -> Path:
     return Path(explicit) if explicit else paths.config_file
 
 
-def load_config(paths: AppPaths | None = None, environ: dict[str, str] | None = None) -> Config:
-    """Load the configuration. A missing file means defaults; an invalid one raises ``ConfigError``."""
+def _read(path: Path) -> dict[str, Any]:
+    try:
+        return tomllib.loads(path.read_text(encoding="utf-8"))
+    except (tomllib.TOMLDecodeError, UnicodeDecodeError) as exc:
+        raise ConfigError(f"{path} is not valid TOML: {exc}") from exc
+
+
+def load_config(
+    paths: AppPaths | None = None, environ: dict[str, str] | None = None, settings_file: Path | None = None
+) -> Config:
+    """Load the configuration. A missing file means defaults; an invalid one raises ``ConfigError``.
+
+    ``settings_file`` replaces ``settings.toml`` in the configuration directory (used to check a
+    change before it is saved).
+    """
     paths = paths or default_paths()
     environ = dict(os.environ) if environ is None else environ
     path = config_file_path(paths, environ)
 
     data: dict[str, Any] = {}
     if path.is_file():
-        try:
-            data = tomllib.loads(path.read_text(encoding="utf-8"))
-        except (tomllib.TOMLDecodeError, UnicodeDecodeError) as exc:
-            raise ConfigError(f"{path} is not valid TOML: {exc}") from exc
+        data = _read(path)
     elif "WEPWAWET_CONFIG" in environ:
         raise ConfigError(f"WEPWAWET_CONFIG points to {path}, which does not exist.")
+    sources = str(path)
+    settings = settings_file or paths.config_dir / SETTINGS_FILE
+    if settings.is_file():
+        data = _merge(data, _read(settings))
+        sources += f" + {SETTINGS_FILE}"
 
     try:
         return Config.model_validate(_merge(data, _env_overrides(environ)))
     except ValidationError as exc:
         details = "; ".join(f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}" for err in exc.errors())
-        raise ConfigError(f"Invalid configuration ({path}): {details}") from exc
+        raise ConfigError(f"Invalid configuration ({sources}): {details}") from exc

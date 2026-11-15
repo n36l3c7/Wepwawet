@@ -29,6 +29,7 @@ from wepwawet.core.events import EventBus
 from wepwawet.core.export import FORMATS, render, summary_csv, target_features
 from wepwawet.core.history import HistoryError, diff_runs
 from wepwawet.core.models import RunReport
+from wepwawet.core.settings import RESTART_REQUIRED, SettingsError, SettingsStore, editable_values
 
 
 class RunRequest(BaseModel):
@@ -39,6 +40,22 @@ class BulkRequest(BaseModel):
     queries: list[str] = Field(min_length=1, max_length=1000)
     max_tests: int = Field(default=500, ge=0, le=100_000)
     passive: bool = False
+
+
+class SettingsRequest(BaseModel):
+    values: dict[str, dict[str, Any]]
+
+
+class KeyRequest(BaseModel):
+    value: str = Field(min_length=1, max_length=1024)
+
+
+def _home_relative(path: Path) -> str:
+    """``~/.config/...`` instead of the full home directory, which names the user."""
+    try:
+        return f"~/{path.relative_to(Path.home()).as_posix()}"
+    except ValueError:
+        return str(path)
 
 
 def _safe(text: str) -> str:
@@ -163,13 +180,68 @@ def create_app(
     def meta() -> dict[str, object]:
         return {
             "version": __version__,
-            "basemap": config.map.basemap,
+            "basemap": (svc.ctx.config if svc.ctx else config).map.basemap,
             "basemaps": {"carto": {"style": CARTO_STYLE_URL}, "offline": {}},
         }
 
     @app.get("/api/providers")
     def providers() -> list[dict[str, Any]]:
         return svc.provider_status()
+
+    def _store() -> SettingsStore:
+        if svc.settings is None or svc.ctx is None:
+            raise HTTPException(status_code=503, detail="Settings are not available in this mode")
+        return svc.settings
+
+    def _current() -> Config:
+        _store()
+        return svc.ctx.config if svc.ctx else config
+
+    def _settings_view() -> dict[str, Any]:
+        store = _store()
+        sources = svc.all_sources()
+        return {
+            "values": editable_values(_current(), [s["name"] for s in sources]),
+            "sources": sources,
+            "keys": store.key_status(),
+            "env_overrides": store.env_overrides(),
+            "restart_required": list(RESTART_REQUIRED),
+            "files": {"settings": _home_relative(store.settings_file), "secrets": _home_relative(store.secrets_file)},
+        }
+
+    def _apply(change: Callable[[SettingsStore], Config]) -> dict[str, Any]:
+        store = _store()
+        if svc.busy():
+            raise HTTPException(status_code=409, detail="A run is in progress. Wait for it to finish or cancel it.")
+        try:
+            svc.reconfigure(change(store))
+        except SettingsError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return _settings_view()
+
+    @app.get("/api/settings")
+    def get_settings() -> dict[str, Any]:
+        return _settings_view()
+
+    @app.put("/api/settings")
+    def put_settings(body: SettingsRequest) -> dict[str, Any]:
+        names = {s["name"] for s in svc.all_sources()}
+        return _apply(lambda store: store.update(body.values, names))
+
+    def _key_change(name: str, value: str | None) -> Callable[[SettingsStore], Config]:
+        def change(store: SettingsStore) -> Config:
+            store.set_key(name, value)
+            return _current()
+
+        return change
+
+    @app.put("/api/settings/keys/{name}")
+    def put_key(name: str, body: KeyRequest) -> dict[str, Any]:
+        return _apply(_key_change(name, body.value))
+
+    @app.delete("/api/settings/keys/{name}")
+    def delete_key(name: str) -> dict[str, Any]:
+        return _apply(_key_change(name, None))
 
     @app.get("/api/budget")
     async def budget() -> list[dict[str, Any]]:

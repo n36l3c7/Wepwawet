@@ -10,7 +10,7 @@ Measurement-based IP geolocation for Linux: passive evidence plus ping and trace
 
 ![Wepwawet locating 77.109.180.62, a RIPE Atlas anchor in Winterthur: the RTT region over Zurich, the probes, the traceroutes and the estimate with its reasons](docs/img/main-window.png)
 
-> **v1.0.1.** Passive sources, about 80 probes, a feasible region, traceroutes read router by router,
+> **v1.1.0.** Passive sources, about 80 probes, a feasible region, traceroutes read router by router,
 > and one fused estimate with its uncertainty, confidence and reasons; history with diff, export, bulk mode
 > and an accuracy benchmark. How it works, and where it stops: [Methodology](https://n36l3c7.github.io/Wepwawet/methodology.html).
 
@@ -52,17 +52,17 @@ Download the package for your distribution from the
 
 ```sh
 # Debian, Ubuntu, Kali
-sudo apt install ./wepwawet_1.0.1-1_amd64.deb
+sudo apt install ./wepwawet_1.1.0-1_amd64.deb
 
 # Fedora
-sudo dnf install ./wepwawet-1.0.1-1.x86_64.rpm
+sudo dnf install ./wepwawet-1.1.0-1.x86_64.rpm
 
 # Arch Linux
-sudo pacman -U wepwawet-1.0.1-1-x86_64.pkg.tar.zst
+sudo pacman -U wepwawet-1.1.0-1-x86_64.pkg.tar.zst
 
 # Any distribution: AppImage (needs libfuse2, or run it with --appimage-extract-and-run)
-chmod +x Wepwawet-1.0.1-x86_64.AppImage
-./Wepwawet-1.0.1-x86_64.AppImage
+chmod +x Wepwawet-1.1.0-x86_64.AppImage
+./Wepwawet-1.1.0-x86_64.AppImage
 ```
 
 The packages install the system libraries Qt needs and recommend `mtr` and `traceroute` for measurements
@@ -150,7 +150,10 @@ what that means for the answer.
 
 ## Configuration
 
-Wepwawet works without configuration. To change a setting, create `~/.config/wepwawet/config.toml`:
+Wepwawet works without configuration. The **settings** button in the window sets the API keys, the map,
+the measurement options and the sources; it saves them in `~/.config/wepwawet/settings.toml` (options)
+and `secrets.toml` (keys, never shown again). For everything else, create
+`~/.config/wepwawet/config.toml`:
 
 ```toml
 [server]
@@ -219,6 +222,8 @@ censys = "..."
 | `WEPWAWET_LOG_LEVEL` | `logging.level` |
 | `WEPWAWET_TOKEN` | Fixed session token for `wepwawet serve` (24+ characters) |
 
+Order: defaults, `config.toml`, `settings.toml` (written by the settings panel), environment variables.
+
 Files: configuration in `~/.config/wepwawet/`, history and logs in `~/.local/share/wepwawet/`, the cache in
 `~/.cache/wepwawet/` (the `XDG_*` variables are honoured). Secrets are never written to the log.
 
@@ -268,7 +273,7 @@ wepwawet benchmark --anchors 10 --max-tests 100 -o benchmark.csv
 | 0.5.0 | Evidence fusion and confidence, history and diff, export, bulk mode (done) |
 | 1.0.0 | Accuracy benchmark, hardening, complete documentation (done) |
 | 1.0.1 | Map overlays on CARTO, software rendering for VMs, exhausted-quota caveat (done) |
-| 1.1.0 | Settings panel: API keys and options from the window |
+| 1.1.0 | Settings panel: API keys and options from the window (done) |
 | 1.2.0 | City and same-network zoom for residential addresses |
 | later | Landmark-based refinement (street-level, experimental) |
 

@@ -85,3 +85,8 @@ export function parseTargets(text) {
   }
   return [...seen]
 }
+
+export const fetchSettings = (options) => getJson('/api/settings', options)
+export const saveSettings = (values) => sendJson('PUT', '/api/settings', { values })
+export const saveKey = (name, value) => sendJson('PUT', `/api/settings/keys/${encodeURIComponent(name)}`, { value })
+export const removeKey = (name) => sendJson('DELETE', `/api/settings/keys/${encodeURIComponent(name)}`)

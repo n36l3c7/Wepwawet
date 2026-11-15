@@ -28,6 +28,17 @@
         Versions follow Semantic Versioning.
       </p>
 
+      <h2>1.1.0 · 2026-11-15</h2>
+      <h3>Added</h3>
+      <ul>
+        <li>
+          Settings panel: API keys, the map, window rendering, log level, measurement options and sources, applied
+          without restarting. Options go to <code>settings.toml</code> (over <code>config.toml</code>, never rewritten),
+          keys to <code>secrets.toml</code> (mode 0600, never sent back to the window).
+        </li>
+        <li><code>/api/settings</code> and <code>/api/settings/keys/{name}</code>.</li>
+      </ul>
+
       <h2>1.0.1 · 2026-11-15</h2>
       <h3>Fixed</h3>
       <ul>
@@ -181,7 +192,7 @@
       <p>First release: the window, the map, the local server, the command line and the Linux packages.</p>
     </main>
     <footer class="site">
-      Wepwawet 1.0.1 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 1.1.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

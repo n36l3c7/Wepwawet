@@ -81,7 +81,17 @@ function BudgetMeter({ budget }) {
   )
 }
 
-export default function TopBar({ version, running, providers, budgets = [], error, onRun, onStop, onBulk }) {
+export default function TopBar({
+  version,
+  running,
+  providers,
+  budgets = [],
+  error,
+  onRun,
+  onStop,
+  onBulk,
+  onSettings,
+}) {
   const [query, setQuery] = useState('')
   const [mode, setMode] = useState('single')
   const [file, setFile] = useState(null)
@@ -191,6 +201,14 @@ export default function TopBar({ version, running, providers, budgets = [], erro
       {budgets.map((b) => (
         <BudgetMeter key={b.provider} budget={b} />
       ))}
+      <button
+        type="button"
+        onClick={onSettings}
+        title="Settings: API keys, options and sources"
+        className="ml-auto border border-line bg-panel px-2 py-0.5 font-mono text-[11px] text-fg-muted hover:border-accent hover:text-fg"
+      >
+        ⚙ settings
+      </button>
     </header>
   )
 }

@@ -24,9 +24,26 @@
     <main>
       <h1>Configuration</h1>
       <p class="lede">
-        Wepwawet works without configuration. Settings come from defaults, then the configuration file, then environment
-        variables.
+        Wepwawet works without configuration. Settings come from defaults, then the configuration file, then the
+        settings panel, then environment variables.
       </p>
+
+      <h2 id="panel">Settings panel</h2>
+      <p>
+        The <b>settings</b> button in the window sets the API keys, the base map, window rendering, the log level, the
+        measurement options and which sources run. Changes apply at once (window rendering at the next start) and are
+        refused while a run is in progress.
+      </p>
+      <ul>
+        <li>
+          Options are saved in <code>~/.config/wepwawet/settings.toml</code>, layered over <code>config.toml</code>,
+          which the window never rewrites. An option fixed by an environment variable is shown locked.
+        </li>
+        <li>
+          Keys are saved in <code>secrets.toml</code> with mode 0600. They are never sent back to the window: it shows
+          only whether a key is set, and whether it comes from the file or the environment.
+        </li>
+      </ul>
 
       <h2>Configuration file</h2>
       <p>Create <code>~/.config/wepwawet/config.toml</code> with the settings you want to change:</p>
@@ -341,7 +358,10 @@ censys = "…"</code></pre>
           <tbody>
             <tr>
               <td><code>~/.config/wepwawet/</code></td>
-              <td><code>config.toml</code>, <code>secrets.toml</code> (<code>$XDG_CONFIG_HOME</code>)</td>
+              <td>
+                <code>config.toml</code>, <code>settings.toml</code>,
+                <code>secrets.toml</code> (<code>$XDG_CONFIG_HOME</code>)
+              </td>
             </tr>
             <tr>
               <td><code>~/.local/share/wepwawet/</code></td>
@@ -359,7 +379,7 @@ censys = "…"</code></pre>
       </div>
     </main>
     <footer class="site">
-      Wepwawet 1.0.1 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 1.1.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

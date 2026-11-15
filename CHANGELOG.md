@@ -7,6 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-15
+
+### Added
+
+- Settings panel (the `settings` button): API keys, the map, window rendering, log level, measurement
+  options and which sources run, applied without restarting (window rendering at the next start).
+  Options are saved in `settings.toml`, layered over `config.toml`, which is never rewritten;
+  environment variables still win. Keys are saved in `secrets.toml` (mode 0600) and never sent back
+  to the window, which only shows whether each key is set and where from.
+- API: `GET`/`PUT /api/settings`, `PUT`/`DELETE /api/settings/keys/{name}`; refused while a run is in
+  progress.
+
 ## [1.0.1] - 2026-11-15
 
 ### Fixed

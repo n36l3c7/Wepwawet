@@ -10,12 +10,20 @@ from typing import Any
 from wepwawet.config import Config
 from wepwawet.core.bulk import BulkJob, new_job, run_bulk
 from wepwawet.core.campaign import Campaign
-from wepwawet.core.context import build_context, enabled_enrichment, enabled_measurement
+from wepwawet.core.context import (
+    ALL_ENRICHMENT,
+    ALL_MEASUREMENT,
+    build_context,
+    enabled_enrichment,
+    enabled_measurement,
+)
 from wepwawet.core.events import EventBus
 from wepwawet.core.history import History
 from wepwawet.core.models import RunReport
 from wepwawet.core.pipeline import Pipeline
 from wepwawet.core.runs import RunManager
+from wepwawet.core.secrets import SecretsError, load_secrets
+from wepwawet.core.settings import SettingsError, SettingsStore
 from wepwawet.paths import AppPaths, default_paths
 from wepwawet.providers.base import EnrichmentProvider, ProviderContext
 from wepwawet.providers.measurement.base import MeasurementProvider
@@ -33,6 +41,7 @@ class Services:
     history: History | None = None
     bulk_jobs: dict[str, BulkJob] = field(default_factory=dict)
     bulk_tasks: dict[str, "asyncio.Task[BulkJob]"] = field(default_factory=dict)
+    settings: SettingsStore | None = None
 
     def pipeline(self, bus: EventBus, max_tests: int | None = None) -> Pipeline:
         """A pipeline; ``max_tests`` caps the measurements (0 = passive only)."""
@@ -97,6 +106,29 @@ class Services:
                     rows.append(dict(budget.__dict__))
         return rows
 
+    def busy(self) -> bool:
+        return bool(self.runs.active()) or self.bulk_running()
+
+    def reconfigure(self, config: Config) -> None:
+        """Use ``config`` and the current keys from now on; refused while a run is in progress."""
+        if self.ctx is None or self.settings is None:
+            raise SettingsError("settings are not available in this mode")
+        if self.busy():
+            raise RuntimeError("A run is in progress. Wait for it to finish or cancel it.")
+        try:
+            secrets_ = load_secrets(self.settings.secrets_file, self.settings.environ)
+        except SecretsError as exc:
+            raise SettingsError(str(exc)) from exc
+        self.ctx = dataclasses.replace(self.ctx, config=config, secrets=secrets_)
+        self.providers = enabled_enrichment(config)
+        self.measurement = enabled_measurement(config)
+        logging.getLogger().setLevel(config.logging.level)
+
+    def all_sources(self) -> list[dict[str, str]]:
+        """Every source, enabled or not, for the settings panel."""
+        rows = [{"name": c.name, "label": c.label, "kind": "enrichment"} for c in ALL_ENRICHMENT]
+        return rows + [{"name": c.name, "label": c.label, "kind": "measurement"} for c in ALL_MEASUREMENT]
+
     async def aclose(self) -> None:
         if self.ctx is not None:
             await self.ctx.http.aclose()
@@ -118,6 +150,7 @@ def default_services(config: Config, paths: AppPaths | None = None) -> Services:
         providers=enabled_enrichment(config),
         measurement=enabled_measurement(config),
         history=history,
+        settings=SettingsStore(resolved),
     )
     services.runs.busy_elsewhere = services.bulk_running
     return services

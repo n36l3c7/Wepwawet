@@ -287,6 +287,12 @@ wepwawet locate ripe.net --passive  # passive sources only, no measurements</cod
       </p>
       <pre><code>wepwawet gui --browser    # same interface, in the system browser
 wepwawet serve            # server only; open the printed address yourself</code></pre>
+      <p>
+        If the window opens but the map does not (Chromium blocklists some GPUs and virtual graphics drivers), start it
+        with software rendering: <code>WEPWAWET_RENDERING=software wepwawet</code>, or set
+        <code>gui.rendering = "software"</code>. Virtual machines and machines without a GPU render node use it
+        automatically.
+      </p>
 
       <h2>The jackal</h2>
       <p>
@@ -296,7 +302,7 @@ wepwawet serve            # server only; open the printed address yourself</code
       </p>
     </main>
     <footer class="site">
-      Wepwawet 1.0.1 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 1.1.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

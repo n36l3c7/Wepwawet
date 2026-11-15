@@ -1,6 +1,6 @@
 [project]
 name = "wepwawet"
-version = "1.0.1"
+version = "1.1.0"
 description = "Measurement-based IP geolocation: passive evidence plus ping and traceroute from many vantage points, on a map."
 readme = "README.md"
 license = "MIT"

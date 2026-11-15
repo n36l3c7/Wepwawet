@@ -22,6 +22,7 @@ Wepwawet is a personal desktop tool:
 - Requests whose `Host` header is not a loopback name are rejected, which blocks DNS-rebinding pages.
 - The interface runs under a Content Security Policy that allows scripts from the application only.
 - API keys are read from the environment or the configuration directory (created with mode `0700`) and
-  are redacted from every log line.
+  are redacted from every log line. The settings panel writes keys to `secrets.toml` with mode `0600`;
+  the API never returns a key, only whether it is set.
 - The application never needs root. To measure from this machine, give `CAP_NET_RAW` to the traceroute
   tool (for example `scamper`), never to Wepwawet.

@@ -16,6 +16,7 @@ import TopBar from './components/layout/TopBar.jsx'
 import LogPane from './components/layout/LogPane.jsx'
 import MapView from './components/map/MapView.jsx'
 import SidePanel from './components/panel/SidePanel.jsx'
+import SettingsDialog from './components/settings/SettingsDialog.jsx'
 
 let nextLogId = 0
 const now = () => new Date().toLocaleTimeString('en-GB', { hour12: false })
@@ -31,6 +32,7 @@ export default function App() {
   const [inputError, setInputError] = useState(null)
   const [budgets, setBudgets] = useState([])
   const [bulk, setBulk] = useState(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const snapshotRef = useRef(null)
 
   const refreshBudget = useCallback(() => {
@@ -90,6 +92,14 @@ export default function App() {
   )
 
   useEffect(() => refreshBudget(), [refreshBudget])
+
+  // Keys and sources changed in the settings: the chips and the quota follow.
+  const onSettingsChanged = useCallback(() => {
+    fetchProviders()
+      .then(setProviders)
+      .catch((error) => log('error', 'api', `Cannot list the data sources: ${error.message}`))
+    refreshBudget()
+  }, [log, refreshBudget])
 
   const onRun = useCallback(
     async (query) => {
@@ -180,6 +190,7 @@ export default function App() {
         onRun={onRun}
         onStop={onStop}
         onBulk={onBulk}
+        onSettings={() => setSettingsOpen(true)}
       />
       <main className="grid min-h-0 grid-cols-[minmax(0,1fr)_400px] max-[1100px]:grid-cols-[minmax(0,1fr)_340px] max-[860px]:grid-cols-1">
         <section className="relative min-h-0 bg-ocean max-[860px]:h-[380px]">
@@ -212,6 +223,7 @@ export default function App() {
         />
       </main>
       <LogPane entries={entries} connection={connection} />
+      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} onChanged={onSettingsChanged} />
     </div>
   )
 }

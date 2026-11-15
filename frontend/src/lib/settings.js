@@ -1,0 +1,68 @@
+/** Options of the settings panel: labels, input kinds and the changes to send. */
+
+export const OPTION_GROUPS = [
+  {
+    title: 'Map and window',
+    options: [
+      { section: 'map', key: 'basemap', label: 'Base map at start-up', choices: ['carto', 'offline'] },
+      {
+        section: 'gui',
+        key: 'rendering',
+        label: 'Window rendering',
+        choices: ['auto', 'software', 'hardware'],
+        help: 'software draws the map on the CPU; auto does so in virtual machines and without a GPU.',
+      },
+      { section: 'logging', key: 'level', label: 'Log level', choices: ['DEBUG', 'INFO', 'WARNING', 'ERROR'] },
+    ],
+  },
+  {
+    title: 'Measurements',
+    options: [
+      { section: 'measurements', key: 'enabled', label: 'Run measurements', type: 'bool' },
+      { section: 'measurements', key: 'max_tests', label: 'Most tests per target', type: 'int', min: 0 },
+      { section: 'measurements', key: 'sweep_probes', label: 'Global sweep probes', type: 'int', min: 0, max: 500 },
+      { section: 'measurements', key: 'zoom_probes', label: 'Regional zoom probes', type: 'int', min: 0, max: 500 },
+      { section: 'measurements', key: 'packets', label: 'Packets per ping', type: 'int', min: 1, max: 16 },
+      { section: 'measurements', key: 'traceroute_probes', label: 'Traceroutes', type: 'int', min: 0, max: 20 },
+      {
+        section: 'measurements',
+        key: 'tcp_fallback_port',
+        label: 'TCP fallback port (0 = off)',
+        type: 'int',
+        min: 0,
+        max: 65535,
+      },
+      { section: 'measurements', key: 'access_correction', label: 'Remove the access delay', type: 'bool' },
+      { section: 'measurements', key: 'calibrate', label: 'CBG calibration (RIPE Atlas anchors)', type: 'bool' },
+      {
+        section: 'measurements',
+        key: 'calibration_anchors',
+        label: 'Calibration anchors',
+        type: 'int',
+        min: 1,
+        max: 20,
+      },
+    ],
+  },
+]
+
+/** Only the options that differ from `original`, in the shape the API expects. */
+export function changedValues(original, edited) {
+  const changes = {}
+  for (const [section, values] of Object.entries(edited)) {
+    for (const [key, value] of Object.entries(values)) {
+      const before = original?.[section]?.[key]
+      const same =
+        value && typeof value === 'object' ? JSON.stringify(value) === JSON.stringify(before) : value === before
+      if (!same) changes[section] = { ...changes[section], [key]: value }
+    }
+  }
+  return changes
+}
+
+/** Where a key comes from, in words. */
+export function keyState(key) {
+  if (key.source === 'env') return `set by ${key.variable}`
+  if (key.source === 'file') return 'set'
+  return 'not set'
+}

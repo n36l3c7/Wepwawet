@@ -283,6 +283,17 @@
               <td>What each measurement source has left (tests this hour, credits)</td>
             </tr>
             <tr>
+              <td><code>GET /api/settings</code>, <code>PUT /api/settings</code></td>
+              <td>
+                The options the settings panel can change, the sources and which keys are set (never their values); body
+                <code>{"values": {"map": {"basemap": "offline"}}}</code>, 422 for an invalid value, 409 during a run
+              </td>
+            </tr>
+            <tr>
+              <td><code>PUT /api/settings/keys/{name}</code>, <code>DELETE /api/settings/keys/{name}</code></td>
+              <td>Body <code>{"value": "…"}</code>; stores or removes a key in <code>secrets.toml</code></td>
+            </tr>
+            <tr>
               <td><code>POST /api/runs</code></td>
               <td>Body <code>{"query": "…"}</code>; starts a run (202), 409 while another runs</td>
             </tr>
@@ -337,7 +348,7 @@
       </div>
     </main>
     <footer class="site">
-      Wepwawet 1.0.1 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 1.1.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>
