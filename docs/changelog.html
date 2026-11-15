@@ -28,6 +28,20 @@
         Versions follow Semantic Versioning.
       </p>
 
+      <h2>1.2.1 · 2026-11-15</h2>
+      <h3>Fixed</h3>
+      <ul>
+        <li>
+          A silent address is measured through the operator's router where most paths to it meet, not the router most
+          paths reach last, which could be a backbone router in another city.
+        </li>
+        <li>
+          The access correction no longer applies to a router standing in for a silent address, and never removes more
+          than 80 % of the fastest RTT: it could shrink the region to a sliver away from the target.
+        </li>
+        <li>Blank window in virtual machines without DRI3: software rendering also composes the window in software.</li>
+      </ul>
+
       <h2>1.2.0 · 2026-11-15</h2>
       <h3>Added</h3>
       <ul>
@@ -210,7 +224,7 @@
       <p>First release: the window, the map, the local server, the command line and the Linux packages.</p>
     </main>
     <footer class="site">
-      Wepwawet 1.2.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 1.2.1 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

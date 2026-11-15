@@ -173,7 +173,7 @@ class SilentLine(SimulatedNetwork):
         return TraceBatch(provider=self.name, results=paths, tests_used=3)
 
 
-async def test_a_silent_address_is_measured_through_its_last_router(app_paths: AppPaths) -> None:
+async def test_a_silent_address_is_measured_through_the_router_where_paths_meet(app_paths: AppPaths) -> None:
     SilentLine.tcp_batches = []
     config = Config.model_validate({"measurements": {"traceroute_probes": 0}})
     ctx = make_ctx(app_paths, config=config)
@@ -186,7 +186,7 @@ async def test_a_silent_address_is_measured_through_its_last_router(app_paths: A
     await Campaign(ctx, [SilentLine()], lambda _l, _s, m: logs.append(m)).run(report, lambda: None)
     assert SilentLine.tcp_batches and max(SilentLine.tcp_batches) <= 9  # only the TCP check, not a full sweep
     assert report.proxy is not None and report.proxy.address == PROXY and report.proxy.paths == 3
-    assert report.region is not None and any("last router of AS1267" in c for c in report.caveats)
+    assert report.region is not None and any("router of AS1267 where the paths" in c for c in report.caveats)
     estimate = fuse(report)
     assert estimate is not None and estimate.uncertainty_km >= report.region.radius_km + report.proxy.margin_km - 0.1
     assert any("answers nothing" in line for line in estimate.explanation)

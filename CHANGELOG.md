@@ -7,6 +7,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-15
+
+### Fixed
+
+- A silent address could be placed 100 km away: the router measured in its place was the one most
+  paths reached last, which can be a backbone router in another city when the hops after it stay
+  silent. The proxy is now the router of the operator where most paths to the address meet (the
+  nearest to the address among equals), traced from at least 6 probes (`measurements.traceroute_probes`
+  when larger); with several paths and no router shared by two of them, nothing stands in.
+- The access correction shrank every bound by the time a router takes to answer a ping when the
+  target was a router standing in for a silent address, which could leave a sliver of region far
+  from it. It no longer applies to a stand-in router, and it never removes more than 80 % of the
+  fastest RTT, which contains the whole access delay.
+- Blank window in virtual machines without DRI3 ("Compositor returned null texture"): software
+  rendering now also composes the window in software (`QT_QUICK_BACKEND=software`, unless already set).
+
 ## [1.2.0] - 2026-11-15
 
 ### Added

@@ -39,6 +39,9 @@ VM_MARKERS = (
 )
 SOFTWARE_FLAGS: tuple[str, ...] = ("--use-angle=swiftshader", "--enable-unsafe-swiftshader")
 HARDWARE_FLAGS: tuple[str, ...] = ("--ignore-gpu-blocklist",)
+# Without DRI3 (most virtual GPUs) Qt cannot import Chromium's frames from GPU memory and shows a
+# blank page; composing the window in software avoids that path.
+SOFTWARE_QT_ENV = {"QT_QUICK_BACKEND": "software"}
 
 
 class GuiUnavailableError(Exception):
@@ -62,7 +65,14 @@ def is_virtual_or_headless_gpu(root: Path = Path("/")) -> bool:
     return False
 
 
-def chromium_flags(mode: Literal["auto", "software", "hardware"], existing: str = "", root: Path = Path("/")) -> str:
+Rendering = Literal["auto", "software", "hardware"]
+
+
+def uses_software(mode: Rendering, root: Path = Path("/")) -> bool:
+    return mode == "software" or (mode == "auto" and is_virtual_or_headless_gpu(root))
+
+
+def chromium_flags(mode: Rendering, existing: str = "", root: Path = Path("/")) -> str:
     """``QTWEBENGINE_CHROMIUM_FLAGS`` for ``mode``, keeping the flags the user already set.
 
     SwiftShader draws WebGL on the CPU; the window shows only this application, so the warning
@@ -71,12 +81,19 @@ def chromium_flags(mode: Literal["auto", "software", "hardware"], existing: str 
     extra: tuple[str, ...]
     if mode == "hardware":
         extra = HARDWARE_FLAGS
-    elif mode == "software" or is_virtual_or_headless_gpu(root):
+    elif uses_software(mode, root):
         extra = SOFTWARE_FLAGS
     else:
         extra = ()
     current = existing.split()
     return " ".join(current + [flag for flag in extra if flag not in current])
+
+
+def qt_environment(mode: Rendering, environ: dict[str, str], root: Path = Path("/")) -> dict[str, str]:
+    """Qt variables to set for ``mode``; a variable the user already set is left alone."""
+    if not uses_software(mode, root):
+        return {}
+    return {name: value for name, value in SOFTWARE_QT_ENV.items() if name not in environ}
 
 
 def _import_webview() -> Any:
@@ -102,7 +119,10 @@ def launch(config: Config, *, browser: bool = False, smoke_test: bool = False) -
     if not browser and sys.platform.startswith("linux"):
         flags = chromium_flags(config.gui.rendering, os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", ""))
         os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = flags
-        log.info("Window rendering", extra={"fields": {"mode": config.gui.rendering, "flags": flags or "-"}})
+        qt_env = qt_environment(config.gui.rendering, dict(os.environ))
+        os.environ.update(qt_env)
+        qt = " ".join(f"{name}={value}" for name, value in qt_env.items()) or "-"
+        log.info("Window rendering", extra={"fields": {"mode": config.gui.rendering, "flags": flags or "-", "qt": qt}})
     webview = None if browser else _import_webview()
 
     token = new_token()

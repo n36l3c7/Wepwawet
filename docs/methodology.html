@@ -73,7 +73,10 @@
       <p>
         Most home routers answer neither ping nor TCP. Then a few traceroutes from the country the passive sources name
         find the operator's last public router on the way to the address (the same autonomous system, the router most
-        paths reach last), and the whole campaign measures that router instead. It is where the line leaves the
+        paths share, the nearest to the address among equals), and the whole campaign measures that router instead.
+        Paths from different places enter the operator at different points and meet only near the address, while the
+        last router a single path shows can be a backbone router elsewhere when the hops after it stay silent; with
+        several paths and no router shared by two of them, nothing stands in. The router is where the line leaves the
         operator's network, so the uncertainty grows by 30 km for the line beyond it, and the report says which router
         stood in.
       </p>
@@ -126,7 +129,9 @@
         centre, 1 to 3 ms like fibre, 3 to 15 ms like cable or xDSL, more like mobile or fixed wireless (Wang et al.,
         2011, use the same idea for landmark-based refinement). Every probe's RTT includes this delay, so 80 % of it is
         removed from every RTT before the region is recomputed; the 20 % margin keeps the region from shrinking past the
-        target when one path had a slower last mile.
+        target when one path had a slower last mile. The correction never exceeds 80 % of the fastest RTT, which
+        contains the whole access delay, and it is not applied to a router standing in for a silent address: there the
+        step is the time the router takes to answer a ping, which a disk must not lose.
       </p>
 
       <h2>8. Fusion and confidence</h2>
@@ -229,7 +234,7 @@
       </ul>
     </main>
     <footer class="site">
-      Wepwawet 1.2.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 1.2.1 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

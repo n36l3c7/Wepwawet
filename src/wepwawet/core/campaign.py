@@ -12,7 +12,6 @@ Each phase checks the test budget first and is skipped, with a log line, when it
 
 import asyncio
 import ipaddress
-from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
@@ -59,9 +58,10 @@ MAX_PTR_LOOKUPS = 120
 # Share of the measured access delay removed from every RTT: conservative, so the region never
 # shrinks past the target when one path had a slower last mile.
 ACCESS_SHARE = 0.8
-# Traceroutes used to find a proxy when the address answers nothing, and how far the line may go on
-# beyond the operator's last router (an aggregation site serves a province, not a whole region).
-PROXY_TRACES = 4
+# Fewest traceroutes used to find a proxy when the address answers nothing (more when
+# ``traceroute_probes`` asks for more), and how far the line may go on beyond the operator's
+# router (an aggregation site serves a province, not a whole region).
+PROXY_TRACES = 6
 # Probes that check whether a filtered address answers TCP before the whole TCP sweep is spent.
 TCP_CHECK_PROBES = 8
 PROXY_MARGIN_KM = 30.0
@@ -153,31 +153,46 @@ def local_locations(report: TargetReport, total: int) -> tuple[list[LocationSpec
     return specs, f"{top.name}, {top.country} and AS{asn}"
 
 
-def pick_proxy(traces: Sequence[TraceResult], asn: int, target: str) -> tuple[RawHop, int] | None:
-    """The router of ``asn`` that most paths reach last before ``target``, and on how many paths.
+def _operator_hops(trace: TraceResult, asn: int, target: str) -> list[RawHop]:
+    """Public routers of ``asn`` that answered on ``trace``: a private hop cannot be pinged from outside."""
+    found: list[RawHop] = []
+    for hop in trace.hops:
+        if hop.address is None or hop.address == target or hop.asn != asn or hop.min_rtt is None:
+            continue
+        try:
+            public = ipaddress.ip_address(hop.address).is_global
+        except ValueError:
+            continue
+        if public and all(h.address != hop.address for h in found):
+            found.append(hop)
+    return found
 
-    Only public addresses that answered count: a private hop cannot be pinged from outside.
+
+def pick_proxy(traces: Sequence[TraceResult], asn: int, target: str) -> tuple[RawHop, int] | None:
+    """The router of ``asn`` where the paths to ``target`` converge, and on how many paths.
+
+    Paths from different places enter the operator at different points and meet only near the
+    target, so the router most paths share, the nearest to the target among equals, is on the
+    target's side of the network. The last router of a single path is not: when the hops after it
+    stay silent it can be a backbone router in another city. With several paths and no router
+    shared by two of them, there is no proxy.
     """
-    counts: Counter[str] = Counter()
-    hops: dict[str, RawHop] = {}
-    for trace in traces:
-        last = None
-        for hop in trace.hops:
-            if hop.address is None or hop.address == target or hop.asn != asn or hop.min_rtt is None:
-                continue
-            try:
-                public = ipaddress.ip_address(hop.address).is_global
-            except ValueError:
-                continue
-            if public:
-                last = hop
-        if last is not None and last.address is not None:
-            counts[last.address] += 1
-            hops.setdefault(last.address, last)
-    if not counts:
+    paths = [hops for trace in traces if (hops := _operator_hops(trace, asn, target))]
+    if not paths:
         return None
-    address, seen = counts.most_common(1)[0]
-    return hops[address], seen
+    depth: dict[str, list[int]] = {}
+    found: dict[str, RawHop] = {}
+    for hops in paths:
+        for position, hop in enumerate(reversed(hops)):  # 0 = the operator's last router on this path
+            address = str(hop.address)
+            depth.setdefault(address, []).append(position)
+            found.setdefault(address, hop)
+    best = max(len(positions) for positions in depth.values())
+    if best < 2 and len(paths) > 1:
+        return None
+    shared = [address for address, positions in depth.items() if len(positions) == best]
+    address = min(shared, key=lambda a: sum(depth[a]) / len(depth[a]))
+    return found[address], best
 
 
 def merge_results(existing: list[ProbeResult], new: Sequence[ProbeResult]) -> list[ProbeResult]:
@@ -348,7 +363,8 @@ class Campaign:
         countries = zoom_countries(report, [])
         if asn is None or not countries or not primary.supports_traceroute:
             return
-        count = self._allowance(state, PROXY_TRACES, minimum=1)
+        wanted = min(max(PROXY_TRACES, self._ctx.config.measurements.traceroute_probes), primary.max_probes)
+        count = self._allowance(state, wanted, minimum=1)
         if not count:
             return
         self._log("info", primary.name, f"Tracing the path to the address from {count} probes in {countries[0]}")
@@ -362,21 +378,12 @@ class Campaign:
         state.tests_used += batch.tests_used
         found = pick_proxy(batch.results, asn, str(report.target.address))
         if found is None:
-            self._log("info", "measure", f"No router of AS{asn} answered on the way: nothing to measure instead")
+            self._log("info", "measure", f"The paths share no router of AS{asn} near the address: nothing to measure")
             return
         hop, seen = found
         name = f"{hop.address} ({hop.hostname})" if hop.hostname else str(hop.address)
-        self._log("info", "measure", f"Measuring {name}, the last router of AS{asn} before the address")
-        stand_in = TargetReport(
-            target=Target(address=ipaddress.ip_address(str(hop.address))),
-            network=report.network,
-            evidence=[e for e in report.evidence if e.point is not None],
-        )
-        state.tcp_port = None
-        await self._run(stand_in, progress, state, allow_proxy=False)
-        if stand_in.region is None:
-            return
-        report.proxy = ProxyTarget(
+        self._log("info", "measure", f"Measuring {name}, where {seen} paths to the address meet in AS{asn}")
+        proxy = ProxyTarget(
             address=str(hop.address),
             hostname=hop.hostname,
             asn=asn,
@@ -384,6 +391,17 @@ class Campaign:
             of=len(batch.results),
             margin_km=PROXY_MARGIN_KM,
         )
+        stand_in = TargetReport(
+            target=Target(address=ipaddress.ip_address(str(hop.address))),
+            network=report.network,
+            evidence=[e for e in report.evidence if e.point is not None],
+            proxy=proxy,  # also turns off the access correction: a router has no access line
+        )
+        state.tcp_port = None
+        await self._run(stand_in, progress, state, allow_proxy=False)
+        if stand_in.region is None:
+            return
+        report.proxy = proxy
         report.probes = stand_in.probes
         report.region = stand_in.region
         report.anycast = stand_in.anycast
@@ -393,8 +411,8 @@ class Campaign:
         report.stages = stand_in.stages
         report.evidence += [e for e in stand_in.evidence if e.source in ("rtt", "traceroute")]
         report.caveats.append(
-            f"The address answers neither ping nor TCP: the measurements located {name}, the last router of "
-            f"AS{asn} on the way to it ({seen} of {len(batch.results)} paths). The line goes on beyond that "
+            f"The address answers neither ping nor TCP: the measurements located {name}, the router of "
+            f"AS{asn} where the paths to it meet ({seen} of {len(batch.results)} paths). The line goes on beyond that "
             f"router, usually within about {PROXY_MARGIN_KM:.0f} km."
         )
         progress()
@@ -710,11 +728,19 @@ class Campaign:
             )
 
     def _access_correction(self, report: TargetReport) -> float:
-        """RTT to remove from every probe: most of the access delay, which every path includes."""
+        """RTT to remove from every probe: most of the access delay, which every path includes.
+
+        Never for a router measured in place of the address: the step before a router is the time it
+        takes to answer a ping itself, not a line. Never more than most of the fastest RTT either,
+        which contains the whole access delay: a larger step is a slow reply, and removing it would
+        shrink every disk past the target.
+        """
         access = report.access
-        if not self._ctx.config.measurements.access_correction or access is None or access.delay_ms < 0.5:
+        cfg = self._ctx.config.measurements
+        if not cfg.access_correction or access is None or access.delay_ms < 0.5 or report.proxy is not None:
             return 0.0
-        return round(ACCESS_SHARE * access.delay_ms, 2)
+        fastest = min((r.min_rtt for r in report.probes if r.min_rtt is not None), default=0.0)
+        return round(ACCESS_SHARE * min(access.delay_ms, fastest), 2)
 
     def _add_evidence(
         self, report: TargetReport, region: Region, anycast: bool, probes: int, correction: float = 0.0
