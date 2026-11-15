@@ -33,6 +33,8 @@ from wepwawet.core.multilateration import area_confidence
 MIN_SIGMA_KM = 25.0
 # Below this radius the RTT region is more precise than GeoIP-style answers, which are city centres.
 PRECISE_REGION_KM = 50.0
+# Confidence removed when the region locates a router in front of the address, not the address.
+PROXY_PENALTY = 10
 AGREEMENT_KM = 60.0
 # Weight of each kind of soft answer when the provider gave none of its own.
 SOURCE_WEIGHT = {
@@ -127,7 +129,10 @@ def fuse(report: TargetReport) -> Estimate | None:
     if region is not None and region.radius_km <= PRECISE_REGION_KM:
         # The measurements are sharper than any soft answer (often a city centre): keep their centre,
         # and let the best candidate only name the place.
-        best = Candidate(best.name, best.country, region.centroid, "centroid")
+        # The region's top candidate is the main city around it, not one of its districts.
+        top = region.candidates[0] if region.candidates else None
+        name, country = (top.name, top.country) if top else (best.name, best.country)
+        best = Candidate(name, country, region.centroid, "centroid")
 
     supporting = [
         e
@@ -154,6 +159,10 @@ def fuse(report: TargetReport) -> Estimate | None:
         uncertainty = max(MIN_SIGMA_KM, *(_sigma(e) for e in supporting or kept))
         confidence = 10 + 7 * min(len(sources), 4)  # passive only: never more than 38
 
+    if report.proxy is not None and region is not None:
+        # The region locates the operator's router; the line itself goes on beyond it.
+        uncertainty += report.proxy.margin_km
+        confidence -= PROXY_PENALTY
     anycast = bool(report.anycast and report.anycast.detected)
     if anycast:
         confidence = min(confidence, 30)
@@ -196,6 +205,12 @@ def explain(report: TargetReport, supporting: list[Evidence], dropped: list[Evid
     if conv is not None:
         where = f" in {conv.label}" if conv.label else ""
         lines.append(f"{conv.paths} of {conv.of} traceroutes meet at {conv.hostname or conv.address}{where}.")
+    if report.proxy is not None:
+        proxy = report.proxy
+        lines.append(
+            f"The address answers nothing: this is where {proxy.hostname or proxy.address}, the operator's last "
+            f"router before it, is; {proxy.margin_km:.0f} km are added for the line beyond."
+        )
     if report.access is not None:
         lines.append(f"The last mile adds about {report.access.delay_ms:.1f} ms ({report.access.technology}).")
     agreeing = [e.label or e.source for e in supporting if e.source not in ("traceroute", "peeringdb")]

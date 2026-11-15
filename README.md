@@ -10,7 +10,7 @@ Measurement-based IP geolocation for Linux: passive evidence plus ping and trace
 
 ![Wepwawet locating 77.109.180.62, a RIPE Atlas anchor in Winterthur: the RTT region over Zurich, the probes, the traceroutes and the estimate with its reasons](docs/img/main-window.png)
 
-> **v1.1.0.** Passive sources, about 80 probes, a feasible region, traceroutes read router by router,
+> **v1.2.0.** Passive sources, about 80 probes, a feasible region, traceroutes read router by router,
 > and one fused estimate with its uncertainty, confidence and reasons; history with diff, export, bulk mode
 > and an accuracy benchmark. How it works, and where it stops: [Methodology](https://n36l3c7.github.io/Wepwawet/methodology.html).
 
@@ -52,17 +52,17 @@ Download the package for your distribution from the
 
 ```sh
 # Debian, Ubuntu, Kali
-sudo apt install ./wepwawet_1.1.0-1_amd64.deb
+sudo apt install ./wepwawet_1.2.0-1_amd64.deb
 
 # Fedora
-sudo dnf install ./wepwawet-1.1.0-1.x86_64.rpm
+sudo dnf install ./wepwawet-1.2.0-1.x86_64.rpm
 
 # Arch Linux
-sudo pacman -U wepwawet-1.1.0-1-x86_64.pkg.tar.zst
+sudo pacman -U wepwawet-1.2.0-1-x86_64.pkg.tar.zst
 
 # Any distribution: AppImage (needs libfuse2, or run it with --appimage-extract-and-run)
-chmod +x Wepwawet-1.1.0-x86_64.AppImage
-./Wepwawet-1.1.0-x86_64.AppImage
+chmod +x Wepwawet-1.2.0-x86_64.AppImage
+./Wepwawet-1.2.0-x86_64.AppImage
 ```
 
 The packages install the system libraries Qt needs and recommend `mtr` and `traceroute` for measurements
@@ -103,7 +103,10 @@ wepwawet doctor             # check the window, the configuration and the tracer
 | This machine / SSH probes | no (their location in the configuration) | Pings from your computer and your own servers |
 
 A campaign sweeps about 48 probes on every continent, then zooms with about 30 probes in the country of the
-fastest one and of the passive answers. Each minimum RTT bounds the distance (light in fibre covers about
+fastest one and of the passive answers, then with about 20 in the most likely city and in the target's own
+network (a probe of the same operator shares its access network). An address that answers neither ping
+nor TCP, like most home routers, is measured through the operator's last router on the way to it, found
+by traceroute; the report says so and widens the uncertainty for the line beyond. Each minimum RTT bounds the distance (light in fibre covers about
 100 km per millisecond of round trip); the places inside every bound form the feasible region, computed on
 an H3 grid, with its centre, an uncertainty radius and the GeoNames cities inside it. Probes too fast for a
 single place reveal anycast. When the target drops ICMP, the sweep is repeated as a TCP handshake to port 443.
@@ -176,7 +179,8 @@ level = "INFO"       # DEBUG, INFO, WARNING, ERROR
 
 [measurements]
 sweep_probes = 48    # global sweep, then
-zoom_probes = 30     # regional zoom
+zoom_probes = 30     # regional zoom, then
+local_probes = 20    # local zoom: the likely city and the target's own network
 max_tests = 150      # per target
 calibrate = false    # CBG calibration against RIPE Atlas anchors
 traceroute_probes = 5
@@ -256,7 +260,11 @@ wepwawet benchmark --anchors 10 --max-tests 100 -o benchmark.csv
 
 ## Known limits
 
-- **Residential**: the realistic ceiling is the city of the provider's PoP or BNG.
+- **Residential**: the realistic ceiling is the city of the provider's PoP or BNG. Latency measures the
+  path to that equipment, not to the home: one millisecond of round trip is about 100 km of fibre, and a
+  home line adds from under one (fibre) to tens of milliseconds (xDSL, radio) of its own, so no
+  measurement separates two neighbourhoods. The local zoom and the access-delay correction narrow the
+  region towards the PoP; a radius of some tens of kilometres around a large city is the expected result.
 - **Mobile and CGNAT**: the gateway can be hundreds of kilometres from the user.
 - **VPN, Tor, proxies, hosting**: the result is the exit server.
 - **Anycast**: there is no single location; Wepwawet flags it instead of guessing.
@@ -274,7 +282,7 @@ wepwawet benchmark --anchors 10 --max-tests 100 -o benchmark.csv
 | 1.0.0 | Accuracy benchmark, hardening, complete documentation (done) |
 | 1.0.1 | Map overlays on CARTO, software rendering for VMs, exhausted-quota caveat (done) |
 | 1.1.0 | Settings panel: API keys and options from the window (done) |
-| 1.2.0 | City and same-network zoom for residential addresses |
+| 1.2.0 | City and same-network zoom for residential addresses (done) |
 | later | Landmark-based refinement (street-level, experimental) |
 
 ## Development

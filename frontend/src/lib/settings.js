@@ -22,6 +22,14 @@ export const OPTION_GROUPS = [
       { section: 'measurements', key: 'max_tests', label: 'Most tests per target', type: 'int', min: 0 },
       { section: 'measurements', key: 'sweep_probes', label: 'Global sweep probes', type: 'int', min: 0, max: 500 },
       { section: 'measurements', key: 'zoom_probes', label: 'Regional zoom probes', type: 'int', min: 0, max: 500 },
+      {
+        section: 'measurements',
+        key: 'local_probes',
+        label: 'Local zoom probes (city and network)',
+        type: 'int',
+        min: 0,
+        max: 500,
+      },
       { section: 'measurements', key: 'packets', label: 'Packets per ping', type: 'int', min: 1, max: 16 },
       { section: 'measurements', key: 'traceroute_probes', label: 'Traceroutes', type: 'int', min: 0, max: 20 },
       {

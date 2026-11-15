@@ -32,6 +32,7 @@ EDITABLE: dict[str, tuple[str, ...]] = {
         "enabled",
         "sweep_probes",
         "zoom_probes",
+        "local_probes",
         "max_tests",
         "packets",
         "tcp_fallback_port",

@@ -7,6 +7,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-15
+
+### Added
+
+- Local zoom: after the regional zoom, up to 20 probes (`measurements.local_probes`, 0 disables it)
+  in the region's most likely city and in the target's own network (same AS, same country). A probe
+  of the same operator shares the target's access network, so its path stays short; for residential
+  addresses this is where the tightest bounds come from. Skipped when the region is already 10 km or
+  less across, or names no city. Probes of this phase are listed as `city`.
+- `measurements.local_probes` in the settings panel.
+- Proxy target: when an address answers neither ping nor TCP (most home routers), traceroutes from
+  the country of the passive answers find the operator's last public router on the way to it, and
+  the whole campaign measures that router instead. The report says so (`proxy`, a caveat and the
+  explanation), and the uncertainty grows by 30 km for the line beyond the router.
+
+### Changed
+
+- When ICMP gets no reply, 8 probes first check whether TCP does; the full TCP sweep runs only if
+  one answers, so a filtered address no longer spends a whole sweep for nothing.
+- A sharp region (50 km or less) is named after its main city, not after a district inside it.
+
 ## [1.1.0] - 2026-11-15
 
 ### Added

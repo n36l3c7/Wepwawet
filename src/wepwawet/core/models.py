@@ -149,7 +149,7 @@ class ProbeResult(_Model):
     """One vantage point's ping towards the target, reduced to what the geometry needs."""
 
     probe: Probe
-    phase: str  # "sweep", "zoom", "local", "ssh"
+    phase: str  # "sweep", "zoom", "city", or the provider name ("local", "ssh")
     min_rtt: float | None = None
     avg_rtt: float | None = None
     loss: float | None = Field(default=None, ge=0, le=1)
@@ -250,6 +250,17 @@ class AccessDelay(_Model):
     paths: int
 
 
+class ProxyTarget(_Model):
+    """A router measured in place of an address that answers nothing: the operator's last one before it."""
+
+    address: str
+    hostname: str | None = None
+    asn: int
+    paths: int  # traceroutes whose last router of the operator was this one
+    of: int
+    margin_km: float  # added to the uncertainty: the line goes on beyond the router
+
+
 class StageEstimate(_Model):
     """The estimate as it stood after one stage, so the benchmark can show what each stage adds."""
 
@@ -283,6 +294,7 @@ class TargetReport(BaseModel):
     traceroutes: list[TracerouteReport] = Field(default_factory=list)
     convergence: Convergence | None = None
     access: AccessDelay | None = None
+    proxy: ProxyTarget | None = None
     tests_used: int = 0  # measurement tests (or credits) this address cost
     stages: list[StageEstimate] = Field(default_factory=list)
     estimate: Estimate | None = None

@@ -12,6 +12,7 @@ Each phase checks the test budget first and is skipped, with a log line, when it
 
 import asyncio
 import ipaddress
+from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
@@ -25,6 +26,7 @@ from wepwawet.core.models import (
     Evidence,
     EvidenceKind,
     ProbeResult,
+    ProxyTarget,
     Region,
     Target,
     TargetReport,
@@ -57,6 +59,14 @@ MAX_PTR_LOOKUPS = 120
 # Share of the measured access delay removed from every RTT: conservative, so the region never
 # shrinks past the target when one path had a slower last mile.
 ACCESS_SHARE = 0.8
+# Traceroutes used to find a proxy when the address answers nothing, and how far the line may go on
+# beyond the operator's last router (an aggregation site serves a province, not a whole region).
+PROXY_TRACES = 4
+# Probes that check whether a filtered address answers TCP before the whole TCP sweep is spent.
+TCP_CHECK_PROBES = 8
+PROXY_MARGIN_KM = 30.0
+# Below this radius the region is already sharp; the local zoom would cost tests for little.
+LOCAL_MIN_RADIUS_KM = 10.0
 FLAG_TEXT = {
     "mpls_or_hidden_hops": "MPLS or hidden hops (RTT jumps across silent hops)",
     "rtt_decreases": "RTT falls along a path (asymmetric return path)",
@@ -121,6 +131,53 @@ def zoom_locations(countries: Sequence[str], total: int) -> list[LocationSpec]:
     weights = [MAX_ZOOM_COUNTRIES - i for i in range(len(countries))]
     shares = [max(1, round(total * w / sum(weights))) for w in weights]
     return [LocationSpec(country=c, limit=n) for c, n in zip(countries, shares, strict=True)]
+
+
+def local_locations(report: TargetReport, total: int) -> tuple[list[LocationSpec], str]:
+    """Probes in the region's most likely city and in the target's own network, with a description.
+
+    A probe of the same operator shares the target's access network, so its path to the target
+    often stays inside the operator's local infrastructure: the shortest paths there are.
+    """
+    region = report.region
+    if region is None or total <= 0 or region.radius_km <= LOCAL_MIN_RADIUS_KM or not region.candidates:
+        return [], ""
+    top = region.candidates[0]
+    asn = report.network.asn if report.network else None
+    if asn is None:
+        return [LocationSpec(country=top.country, city=top.name, limit=total)], f"{top.name}, {top.country}"
+    same_network = max(1, total // 2)
+    specs = [LocationSpec(country=top.country, asn=asn, limit=same_network)]
+    if total - same_network > 0:
+        specs.append(LocationSpec(country=top.country, city=top.name, limit=total - same_network))
+    return specs, f"{top.name}, {top.country} and AS{asn}"
+
+
+def pick_proxy(traces: Sequence[TraceResult], asn: int, target: str) -> tuple[RawHop, int] | None:
+    """The router of ``asn`` that most paths reach last before ``target``, and on how many paths.
+
+    Only public addresses that answered count: a private hop cannot be pinged from outside.
+    """
+    counts: Counter[str] = Counter()
+    hops: dict[str, RawHop] = {}
+    for trace in traces:
+        last = None
+        for hop in trace.hops:
+            if hop.address is None or hop.address == target or hop.asn != asn or hop.min_rtt is None:
+                continue
+            try:
+                public = ipaddress.ip_address(hop.address).is_global
+            except ValueError:
+                continue
+            if public:
+                last = hop
+        if last is not None and last.address is not None:
+            counts[last.address] += 1
+            hops.setdefault(last.address, last)
+    if not counts:
+        return None
+    address, seen = counts.most_common(1)[0]
+    return hops[address], seen
 
 
 def merge_results(existing: list[ProbeResult], new: Sequence[ProbeResult]) -> list[ProbeResult]:
@@ -197,7 +254,9 @@ class Campaign:
         finally:
             report.tests_used = state.tests_used
 
-    async def _run(self, report: TargetReport, progress: Progress, state: CampaignState) -> None:
+    async def _run(
+        self, report: TargetReport, progress: Progress, state: CampaignState, allow_proxy: bool = True
+    ) -> None:
         cfg = self._ctx.config.measurements
         usable = self.available()
         if not cfg.enabled or not usable:
@@ -241,6 +300,8 @@ class Campaign:
             where = ", ".join(p for p in (best.probe.city, best.probe.country) if p)
             self._log("info", "measure", f"Fastest so far: {where} {best.min_rtt:.1f} ms")
         elif report.probes and not await self._tcp_sweep(report, primary, state, progress):
+            if allow_proxy and primary is not None:
+                await self._proxy(report, primary, state, progress)
             return
         answered = [r for r in report.probes if r.min_rtt is not None]
 
@@ -263,9 +324,13 @@ class Campaign:
             self._finish_geometry(report)
             progress()
 
+        # 4. Local zoom: the most likely city and the target's own network.
+        if primary:
+            await self._local_zoom(report, primary, state, progress)
+
         report.record_stage("pings", report.estimate if report.region else None)
 
-        # 4. Traceroutes from the fastest probes: hop locations, convergence, access delay.
+        # 5. Traceroutes from the fastest probes: hop locations, convergence, access delay.
         tracers = [p for p in usable if p.supports_traceroute]
         if tracers and cfg.traceroute_probes:
             await self._traceroutes(report, tracers, state)
@@ -274,6 +339,85 @@ class Campaign:
                 report.record_stage("traceroutes", fuse(report))
             progress()
         self._log("info", "measure", f"Measurements used {state.tests_used} tests")
+
+    async def _proxy(
+        self, report: TargetReport, primary: MeasurementProvider, state: CampaignState, progress: Progress
+    ) -> None:
+        """Measure the operator's last router before an address that answers nothing."""
+        asn = report.network.asn if report.network else None
+        countries = zoom_countries(report, [])
+        if asn is None or not countries or not primary.supports_traceroute:
+            return
+        count = self._allowance(state, PROXY_TRACES, minimum=1)
+        if not count:
+            return
+        self._log("info", primary.name, f"Tracing the path to the address from {count} probes in {countries[0]}")
+        try:
+            batch = await primary.traceroute(
+                report.target, [LocationSpec(country=countries[0], limit=count)], self._ctx
+            )
+        except ProviderError as exc:
+            self._log("error", primary.name, exc.message)
+            return
+        state.tests_used += batch.tests_used
+        found = pick_proxy(batch.results, asn, str(report.target.address))
+        if found is None:
+            self._log("info", "measure", f"No router of AS{asn} answered on the way: nothing to measure instead")
+            return
+        hop, seen = found
+        name = f"{hop.address} ({hop.hostname})" if hop.hostname else str(hop.address)
+        self._log("info", "measure", f"Measuring {name}, the last router of AS{asn} before the address")
+        stand_in = TargetReport(
+            target=Target(address=ipaddress.ip_address(str(hop.address))),
+            network=report.network,
+            evidence=[e for e in report.evidence if e.point is not None],
+        )
+        state.tcp_port = None
+        await self._run(stand_in, progress, state, allow_proxy=False)
+        if stand_in.region is None:
+            return
+        report.proxy = ProxyTarget(
+            address=str(hop.address),
+            hostname=hop.hostname,
+            asn=asn,
+            paths=seen,
+            of=len(batch.results),
+            margin_km=PROXY_MARGIN_KM,
+        )
+        report.probes = stand_in.probes
+        report.region = stand_in.region
+        report.anycast = stand_in.anycast
+        report.traceroutes = stand_in.traceroutes
+        report.convergence = stand_in.convergence
+        report.estimate = stand_in.estimate
+        report.stages = stand_in.stages
+        report.evidence += [e for e in stand_in.evidence if e.source in ("rtt", "traceroute")]
+        report.caveats.append(
+            f"The address answers neither ping nor TCP: the measurements located {name}, the last router of "
+            f"AS{asn} on the way to it ({seen} of {len(batch.results)} paths). The line goes on beyond that "
+            f"router, usually within about {PROXY_MARGIN_KM:.0f} km."
+        )
+        progress()
+
+    async def _local_zoom(
+        self, report: TargetReport, primary: MeasurementProvider, state: CampaignState, progress: Progress
+    ) -> None:
+        cfg = self._ctx.config.measurements
+        wanted = min(cfg.local_probes, primary.max_probes)
+        specs, where = local_locations(report, wanted)
+        if not specs:
+            return
+        count = self._allowance(state, wanted)
+        if not count:
+            return
+        if count < wanted:
+            specs, where = local_locations(report, count)
+        self._log("info", primary.name, f"Local zoom: {count} probes in {where}")
+        batch = await self._ping(primary, report.target, specs, state)
+        if batch and batch.results:
+            report.probes = merge_results(report.probes, self._to_results(batch, "city"))
+            self._finish_geometry(report)
+            progress()
 
     async def _tcp_sweep(
         self, report: TargetReport, primary: MeasurementProvider | None, state: CampaignState, progress: Progress
@@ -290,8 +434,16 @@ class Campaign:
         self._log("info", primary.name, f"No ICMP replies: measuring the TCP handshake to port {port} instead")
         state.tcp_port = port
         report.probes = []
-        locations = sweep_locations(sweep)
-        batch = await self._ping(primary, report.target, locations, state)
+        # A filtered address answers no probe at all: a few probes tell, before the whole sweep is spent.
+        check = await self._ping(primary, report.target, sweep_locations(min(TCP_CHECK_PROBES, sweep)), state)
+        if not check or not any(r.min_rtt is not None for r in check.results):
+            self._log("info", "measure", f"No reply over TCP port {port} either: the target cannot be measured")
+            return False
+        sweep = self._allowance(state, sweep - len(check.results))
+        locations = sweep_locations(sweep) if sweep else []
+        batch = await self._ping(primary, report.target, locations, state) if locations else check
+        if batch is not check and batch:
+            batch.results = [*check.results, *batch.results]
         if batch:
             report.probes = merge_results([], self._to_results(batch, "sweep"))
             self._finish_geometry(report)

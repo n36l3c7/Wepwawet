@@ -76,6 +76,8 @@ class MeasurementsConfig(_Section):
     speed_km_per_ms: float = Field(default=200.0, gt=50, le=300)
     sweep_probes: int = Field(default=48, ge=0, le=500)
     zoom_probes: int = Field(default=30, ge=0, le=500)
+    # Probes in the most likely city and in the target's own network, after the zoom (0 disables it).
+    local_probes: int = Field(default=20, ge=0, le=500)
     packets: int = Field(default=3, ge=1, le=16)
     # When no probe gets an ICMP reply, measure the TCP handshake to this port instead (0 disables it).
     tcp_fallback_port: int = Field(default=443, ge=0, le=65535)

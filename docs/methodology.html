@@ -65,8 +65,17 @@
       <p>
         A global sweep pings the target from about 48 Globalping probes on every continent; the fastest probes are near
         it. A regional zoom then uses about 30 probes in the fastest probe's country and in the countries the passive
-        sources name, which gives bounds of tens of kilometres when a probe is in the same city. Both phases respect a
-        test budget and Globalping's hourly limit.
+        sources name, which gives bounds of tens of kilometres when a probe is in the same city. A local zoom follows
+        with about 20 probes in the region's most likely city and in the target's own autonomous system: a probe of the
+        same operator reaches the target through the operator's own local network, so its RTT is the shortest available,
+        which matters most for residential lines. Every phase respects a test budget and Globalping's hourly limit.
+      </p>
+      <p>
+        Most home routers answer neither ping nor TCP. Then a few traceroutes from the country the passive sources name
+        find the operator's last public router on the way to the address (the same autonomous system, the router most
+        paths reach last), and the whole campaign measures that router instead. It is where the line leaves the
+        operator's network, so the uncertainty grows by 30 km for the line beyond it, and the report says which router
+        stood in.
       </p>
 
       <h2>4. The feasible region</h2>
@@ -183,7 +192,10 @@
       <ul>
         <li>
           <strong>Residential</strong>: the realistic ceiling is the provider's point of presence or BNG. The
-          subscriber's address is only in the provider's records.
+          subscriber's address is only in the provider's records. Latency measures the path to that equipment: one
+          millisecond of round trip is about 100 km of fibre, and a home line adds from under one millisecond (fibre) to
+          tens (xDSL, radio), so no measurement separates two neighbourhoods. Around a large city, a radius of some tens
+          of kilometres is the expected result.
         </li>
         <li>
           <strong>Mobile and CGNAT</strong>: traffic leaves through a gateway that can be hundreds of kilometres from
@@ -217,7 +229,7 @@
       </ul>
     </main>
     <footer class="site">
-      Wepwawet 1.1.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 1.2.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

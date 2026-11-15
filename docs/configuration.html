@@ -69,6 +69,7 @@ level = "INFO"       # DEBUG, INFO, WARNING, ERROR
 enabled = true
 sweep_probes = 48    # global sweep
 zoom_probes = 30     # regional zoom
+local_probes = 20    # local zoom: the likely city and the target's own network
 packets = 3
 max_tests = 150      # per target
 tcp_fallback_port = 443
@@ -162,6 +163,14 @@ enabled = false      # turn any source off</code></pre>
               <td><code>measurements.sweep_probes</code>, <code>zoom_probes</code></td>
               <td><code>48</code>, <code>30</code></td>
               <td>Probes in the global sweep and in the regional zoom.</td>
+            </tr>
+            <tr>
+              <td><code>measurements.local_probes</code></td>
+              <td><code>20</code></td>
+              <td>
+                Probes in the region's most likely city and in the target's own network, after the zoom; <code>0</code>
+                turns the local zoom off.
+              </td>
             </tr>
             <tr>
               <td><code>measurements.packets</code></td>
@@ -379,7 +388,7 @@ censys = "…"</code></pre>
       </div>
     </main>
     <footer class="site">
-      Wepwawet 1.1.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 1.2.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>
