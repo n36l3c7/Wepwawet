@@ -402,8 +402,8 @@ export default function MapView({
           <p className="font-mono text-sm text-high">The map cannot start: {webglError}.</p>
           <p className="text-fg-muted">
             This display has no working WebGL. Start the window with software rendering:{' '}
-            <code className="font-mono text-accent-fg">WEPWAWET_RENDERING=software wepwawet</code>, or open it in
-            your browser: <code className="font-mono text-accent-fg">wepwawet gui --browser</code>
+            <code className="font-mono text-accent-fg">WEPWAWET_RENDERING=software wepwawet</code>, or open it in your
+            browser: <code className="font-mono text-accent-fg">wepwawet gui --browser</code>
           </p>
         </div>
       </div>
