@@ -102,6 +102,7 @@ export const SOURCE_LABELS = {
   censys: 'Censys',
   peeringdb: 'PeeringDB',
   classify: 'Network classification',
+  landmark: 'Landmarks (experimental)',
 }
 
 /** RTT colour band (1 = near, 5 = far): thresholds in milliseconds. */

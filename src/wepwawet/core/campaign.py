@@ -6,6 +6,8 @@
 3. Optional CBG calibration: the zoom probes also ping RIPE Atlas anchors of known position,
    and each probe gets its own delay-to-distance line.
 4. Multilateration intersects the disks; disjoint disks far apart mean anycast.
+5. Local zoom, traceroutes and, experimental and off by default, landmarks of known position
+   matched to the target by RTT pattern (see ``landmarks``).
 
 Each phase checks the test budget first and is skipped, with a log line, when it would exceed it.
 """
@@ -20,6 +22,15 @@ from wepwawet.core.geo import Bestline, fit_bestline, haversine, sol_max_distanc
 from wepwawet.core.geohints import load_hint_data
 from wepwawet.core.http import ProviderError
 from wepwawet.core.ixp import load_ixp_index
+from wepwawet.core.landmarks import (
+    ATLAS_PROBES_URL,
+    MIN_SHARED_PROBES,
+    choose,
+    landmark_evidence,
+    match,
+    parse_landmarks,
+    search_radius_km,
+)
 from wepwawet.core.models import (
     Estimate,
     Evidence,
@@ -206,12 +217,22 @@ def merge_results(existing: list[ProbeResult], new: Sequence[ProbeResult]) -> li
     return sorted(by_key.values(), key=lambda r: (r.min_rtt is None, r.min_rtt or 0))
 
 
+@dataclass(frozen=True)
+class Reference:
+    provider: str
+    reuse_key: str
+    size: int  # probes in that measurement: what one more target costs from them
+    rtts: dict[str, float]  # probe key -> minimum RTT to the target
+
+
 @dataclass
 class CampaignState:
     tests_used: int = 0
     limit: int = 0  # most tests this target may use: max_tests, or what the provider has left
     tcp_port: int | None = None  # set when the target only answers TCP
     reuse: dict[str, str] = field(default_factory=dict)  # provider -> reuse key of the zoom measurement
+    # The nearest probes measured so far (local zoom, else regional zoom), to compare landmarks with.
+    reference: Reference | None = None
 
 
 class Campaign:
@@ -329,6 +350,7 @@ class Campaign:
             if batch:
                 if batch.reuse_key:
                     state.reuse[primary.name] = batch.reuse_key
+                self._keep_reference(state, batch)
                 report.probes = merge_results(report.probes, self._to_results(batch, "zoom"))
                 self._finish_geometry(report)
                 progress()
@@ -353,7 +375,71 @@ class Campaign:
             if report.traceroutes:
                 report.record_stage("traceroutes", fuse(report))
             progress()
+
+        # 6. Experimental: landmarks of known position that look like the target from the same probes.
+        if cfg.landmarks and primary:
+            await self._landmarks(report, primary, state)
+            if any(e.source == "landmark" for e in report.evidence):
+                report.record_stage("landmarks", fuse(report))
+            progress()
         self._log("info", "measure", f"Measurements used {state.tests_used} tests")
+
+    @staticmethod
+    def _keep_reference(state: CampaignState, batch: PingBatch) -> None:
+        rtts = {f"{r.probe.provider}:{r.probe.probe_id}": r.min_rtt for r in batch.results if r.min_rtt is not None}
+        if batch.reuse_key and len(rtts) >= MIN_SHARED_PROBES:
+            state.reference = Reference(batch.provider, batch.reuse_key, len(batch.results), rtts)
+
+    async def _landmarks(self, report: TargetReport, primary: MeasurementProvider, state: CampaignState) -> None:
+        """Ping landmarks inside the region from the nearest probes and add the best match as soft evidence."""
+        region, reference = report.region, state.reference
+        if region is None:
+            return
+        if reference is None or reference.provider != primary.name:
+            self._log("info", "landmarks", "No probes to compare landmarks from: skipped")
+            return
+        wanted = self._ctx.config.measurements.landmarks
+        affordable = max(0, state.limit - state.tests_used) // max(1, reference.size)
+        count = min(wanted, affordable)
+        if count < 2:
+            self._log("info", "landmarks", f"Skipped: {reference.size} tests per landmark, too few left in the budget")
+            return
+        version = report.target.address.version
+        params = {
+            "radius": f"{region.centroid.lat:.4f},{region.centroid.lon:.4f}:{search_radius_km(region.radius_km)}",
+            "status": 1,
+            "is_public": "true",
+            "fields": "id,address_v4,address_v6,asn_v4,asn_v6,geometry,is_anchor",
+            "page_size": 200,
+        }
+        try:
+            data, _ = await self._ctx.http.get_json("ripe-atlas-probes", ATLAS_PROBES_URL, params=params, ttl=86_400)
+        except ProviderError as exc:
+            self._log("error", "landmarks", f"RIPE Atlas probes unavailable: {exc.message}")
+            return
+        asn = report.network.asn if report.network else None
+        found = parse_landmarks(data, version, str(report.target.address))
+        chosen = choose(found, region.centroid, count, asn)
+        if not chosen:
+            self._log("info", "landmarks", "No RIPE Atlas probe with a public address in the region")
+            return
+        self._log(
+            "info", "landmarks", f"Experimental: pinging {len(chosen)} RIPE Atlas probes from {reference.size} probes"
+        )
+        measured = {}
+        for landmark in chosen:
+            target = Target(address=ipaddress.ip_address(landmark.address))
+            batch = await self._ping(primary, target, reference.reuse_key, state)
+            if batch:
+                measured[landmark] = {
+                    f"{r.probe.provider}:{r.probe.probe_id}": r.min_rtt for r in batch.results if r.min_rtt is not None
+                }
+        evidence = landmark_evidence(match(reference.rtts, measured), len(chosen))
+        if evidence is None:
+            self._log("info", "landmarks", "Too few landmarks answered to compare")
+            return
+        report.evidence = [e for e in report.evidence if e.source != "landmark"] + [evidence]
+        self._log("info", "landmarks", evidence.summary)
 
     async def _proxy(
         self, report: TargetReport, primary: MeasurementProvider, state: CampaignState, progress: Progress
@@ -409,7 +495,7 @@ class Campaign:
         report.convergence = stand_in.convergence
         report.estimate = stand_in.estimate
         report.stages = stand_in.stages
-        report.evidence += [e for e in stand_in.evidence if e.source in ("rtt", "traceroute")]
+        report.evidence += [e for e in stand_in.evidence if e.source in ("rtt", "traceroute", "landmark")]
         report.caveats.append(
             f"The address answers neither ping nor TCP: the measurements located {name}, the router of "
             f"AS{asn} where the paths to it meet ({seen} of {len(batch.results)} paths). The line goes on beyond that "
@@ -433,6 +519,7 @@ class Campaign:
         self._log("info", primary.name, f"Local zoom: {count} probes in {where}")
         batch = await self._ping(primary, report.target, specs, state)
         if batch and batch.results:
+            self._keep_reference(state, batch)
             report.probes = merge_results(report.probes, self._to_results(batch, "city"))
             self._finish_geometry(report)
             progress()

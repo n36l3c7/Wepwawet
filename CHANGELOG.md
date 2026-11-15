@@ -7,6 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-15
+
+### Added
+
+- Landmark refinement, experimental and off by default (`measurements.landmarks`, 0 to 20, also in
+  the settings panel). RIPE Atlas probes inside the region, half of them on the target's own
+  network, are pinged from the nearest probes that measured the target (local zoom, else regional
+  zoom); the landmarks whose RTTs follow the target's most closely, probe by probe, give a soft
+  answer (`landmark` evidence, with every landmark compared in its details) that the fusion weighs
+  like any other and drops when it falls outside the region. Each landmark costs one test per probe;
+  the phase is skipped when the budget cannot pay for two. The report records a `landmarks` stage.
+
 ## [1.2.1] - 2026-11-15
 
 ### Fixed

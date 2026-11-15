@@ -134,6 +134,20 @@
         step is the time the router takes to answer a ping, which a disk must not lose.
       </p>
 
+      <h3>Landmarks (experimental)</h3>
+      <p>
+        With <code>measurements.landmarks</code> set, RIPE Atlas probes inside the region, which publish their position
+        and public address, become landmarks: half of them on the target's own network when there are any, the rest
+        spread over the region. The nearest probes that measured the target (the local zoom) ping each landmark, and
+        every landmark gets a score, the median over the shared probes of |RTT to the target − RTT to the landmark|. A
+        landmark next to the target, on the same paths, scores near zero: this is the delay-space idea of GeoPing
+        (Padmanabhan and Subramanian, 2001), applied only inside the region the disks already allow, in the spirit of
+        the landmark refinement of Wang et al. (2011). The three best landmarks, weighted by 1 / (score + 0.2 ms), give
+        a soft answer whose accuracy is their spread (at least 5 km). It is experimental: landmark positions are set by
+        their hosts, many home probes do not answer pings, and two places in one city can sit behind very different
+        paths, so the answer only ranks places inside the region and never moves the hard limit.
+      </p>
+
       <h2>8. Fusion and confidence</h2>
       <p>
         The RTT region is a hard limit. Inside it, every candidate place (the cities in the region and the soft answers
@@ -224,6 +238,10 @@
         </li>
         <li>E. Katz-Bassett et al. Towards IP Geolocation Using Delay and Topology Measurements. IMC 2006.</li>
         <li>
+          V. N. Padmanabhan, L. Subramanian. An Investigation of Geographic Mapping Techniques for Internet Hosts.
+          SIGCOMM 2001.
+        </li>
+        <li>
           Y. Wang, D. Burgener, M. Flores, A. Kuzmanovic, C. Huang. Towards Street-Level Client-Independent IP
           Geolocation. NSDI 2011.
         </li>
@@ -234,7 +252,7 @@
       </ul>
     </main>
     <footer class="site">
-      Wepwawet 1.2.1 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 1.3.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

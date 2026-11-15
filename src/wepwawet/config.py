@@ -90,6 +90,9 @@ class MeasurementsConfig(_Section):
     # Subtract most of the estimated access delay from every RTT before multilateration.
     access_correction: bool = True
     calibration_anchors: int = Field(default=4, ge=1, le=20)
+    # Experimental: RIPE Atlas probes in the region pinged from the local probes, matched to the
+    # target by RTT pattern (0 disables it).
+    landmarks: int = Field(default=0, ge=0, le=20)
 
 
 class ProviderSettings(BaseModel):

@@ -50,6 +50,15 @@ export const OPTION_GROUPS = [
         min: 1,
         max: 20,
       },
+      {
+        section: 'measurements',
+        key: 'landmarks',
+        label: 'Landmarks, experimental (0 = off)',
+        type: 'int',
+        min: 0,
+        max: 20,
+        help: 'RIPE Atlas probes in the region, pinged from the nearest probes: each costs one test per probe.',
+      },
     ],
   },
 ]

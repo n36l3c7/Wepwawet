@@ -75,6 +75,7 @@ max_tests = 150      # per target
 tcp_fallback_port = 443
 traceroute_probes = 5
 access_correction = true
+landmarks = 0        # experimental landmark refinement
 
 [providers.rdns]
 sweep = true         # PTR lookups of the /24 neighbours
@@ -210,6 +211,15 @@ enabled = false      # turn any source off</code></pre>
               <td><code>measurements.access_correction</code></td>
               <td><code>true</code></td>
               <td>Remove 80 % of the measured access delay from every RTT before computing the region.</td>
+            </tr>
+            <tr>
+              <td><code>measurements.landmarks</code></td>
+              <td><code>0</code></td>
+              <td>
+                Experimental: how many RIPE Atlas probes inside the region (0 to 20) the nearest probes also ping, to
+                find the ones whose RTTs look like the target's. Each costs one test per probe of the local zoom (about
+                20); <code>0</code> disables it.
+              </td>
             </tr>
             <tr>
               <td><code>providers.local.lat</code>, <code>lon</code></td>
@@ -389,7 +399,7 @@ censys = "…"</code></pre>
       </div>
     </main>
     <footer class="site">
-      Wepwawet 1.2.1 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
+      Wepwawet 1.3.0 · MIT licence · <a href="https://github.com/n36l3c7/Wepwawet">source</a>
     </footer>
   </body>
 </html>

@@ -264,7 +264,7 @@ class ProxyTarget(_Model):
 class StageEstimate(_Model):
     """The estimate as it stood after one stage, so the benchmark can show what each stage adds."""
 
-    stage: str  # "passive", "pings", "traceroutes", "final"
+    stage: str  # "passive", "pings", "traceroutes", "landmarks", "final"
     location: GeoPoint
     uncertainty_km: float
     confidence: int

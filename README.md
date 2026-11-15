@@ -10,7 +10,7 @@ Measurement-based IP geolocation for Linux: passive evidence plus ping and trace
 
 ![Wepwawet locating 77.109.180.62, a RIPE Atlas anchor in Winterthur: the RTT region over Zurich, the probes, the traceroutes and the estimate with its reasons](docs/img/main-window.png)
 
-> **v1.2.1.** Passive sources, about 80 probes, a feasible region, traceroutes read router by router,
+> **v1.3.0.** Passive sources, about 80 probes, a feasible region, traceroutes read router by router,
 > and one fused estimate with its uncertainty, confidence and reasons; history with diff, export, bulk mode
 > and an accuracy benchmark. How it works, and where it stops: [Methodology](https://n36l3c7.github.io/Wepwawet/methodology.html).
 
@@ -52,17 +52,17 @@ Download the package for your distribution from the
 
 ```sh
 # Debian, Ubuntu, Kali
-sudo apt install ./wepwawet_1.2.1-1_amd64.deb
+sudo apt install ./wepwawet_1.3.0-1_amd64.deb
 
 # Fedora
-sudo dnf install ./wepwawet-1.2.1-1.x86_64.rpm
+sudo dnf install ./wepwawet-1.3.0-1.x86_64.rpm
 
 # Arch Linux
-sudo pacman -U wepwawet-1.2.1-1-x86_64.pkg.tar.zst
+sudo pacman -U wepwawet-1.3.0-1-x86_64.pkg.tar.zst
 
 # Any distribution: AppImage (needs libfuse2, or run it with --appimage-extract-and-run)
-chmod +x Wepwawet-1.2.1-x86_64.AppImage
-./Wepwawet-1.2.1-x86_64.AppImage
+chmod +x Wepwawet-1.3.0-x86_64.AppImage
+./Wepwawet-1.3.0-x86_64.AppImage
 ```
 
 The packages install the system libraries Qt needs and recommend `mtr` and `traceroute` for measurements
@@ -116,7 +116,9 @@ place (an airport or UN/LOCODE code, a city, an operator's own code); a name is 
 router's RTT allows it. Routers inside an exchange's peering LAN (PeeringDB) are placed at that exchange.
 The router where most paths meet is the convergence point, and the RTT step from the last router to the
 target estimates the access line (fibre, xDSL, mobile), most of which is removed from every RTT (never more than 80 % of the fastest one, and never for a
-router standing in for a silent address) before the region is recomputed. Operator naming rules live in
+router standing in for a silent address) before the region is recomputed. Optionally (`landmarks`, experimental, off by default) the nearest probes
+also ping RIPE Atlas probes inside the region, and the ones whose RTTs follow the target's most closely
+add a soft answer. Operator naming rules live in
 [`geohint_rules.toml`](src/wepwawet/data/geohint_rules.toml) and are easy to extend.
 
 ## The estimate
@@ -185,6 +187,7 @@ max_tests = 150      # per target
 calibrate = false    # CBG calibration against RIPE Atlas anchors
 traceroute_probes = 5
 access_correction = true  # remove most of the access delay before multilateration
+landmarks = 0        # experimental: RIPE Atlas probes in the region matched by RTT pattern
 
 [providers.rdns]
 sweep = true         # PTR lookups of the /24 neighbours
@@ -284,7 +287,7 @@ wepwawet benchmark --anchors 10 --max-tests 100 -o benchmark.csv
 | 1.1.0 | Settings panel: API keys and options from the window (done) |
 | 1.2.0 | City and same-network zoom for residential addresses (done) |
 | 1.2.1 | Proxy where the paths meet, no access correction for routers, blank VM window (done) |
-| later | Landmark-based refinement (street-level, experimental) |
+| 1.3.0 | Landmark refinement with RIPE Atlas probes (experimental, done) |
 
 ## Development
 

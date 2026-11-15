@@ -40,16 +40,14 @@ def destination(origin: GeoPoint, bearing_deg: float, distance_km: float) -> Geo
     return GeoPoint(lat=math.degrees(p2), lon=(math.degrees(l2) + 540) % 360 - 180)
 
 
-def spherical_mean(points: Sequence[GeoPoint]) -> GeoPoint:
-    """Centroid on the sphere (average of unit vectors); correct across the antimeridian."""
+def spherical_mean(points: Sequence[GeoPoint], weights: Sequence[float] | None = None) -> GeoPoint:
+    """Centroid on the sphere (weighted average of unit vectors); correct across the antimeridian."""
     x = y = z = 0.0
-    for p in points:
+    for p, w in zip(points, weights or [1.0] * len(points), strict=True):
         lat, lon = math.radians(p.lat), math.radians(p.lon)
-        x += math.cos(lat) * math.cos(lon)
-        y += math.cos(lat) * math.sin(lon)
-        z += math.sin(lat)
-    n = len(points)
-    x, y, z = x / n, y / n, z / n
+        x += w * math.cos(lat) * math.cos(lon)
+        y += w * math.cos(lat) * math.sin(lon)
+        z += w * math.sin(lat)
     return GeoPoint(lat=math.degrees(math.atan2(z, math.hypot(x, y))), lon=math.degrees(math.atan2(y, x)))
 
 
